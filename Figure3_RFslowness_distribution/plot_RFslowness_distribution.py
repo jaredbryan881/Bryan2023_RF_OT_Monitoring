@@ -9,8 +9,6 @@ from telewavesim import utils as ut
 import sys
 sys.path.append("../")
 from sim_synth import simulate_RF
-
-sys.path.append("../../../../distance")
 from distribution_utils import create_grid, rf_hist
 
 def main():
