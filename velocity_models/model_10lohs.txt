@@ -1,0 +1,40 @@
+################################################
+# 
+#   Model file to use with `telewavesim` for 
+#   modeling teleseismic body wave propagation 
+#   through stratified media.
+#
+#   Lines starting with '#' are ignored. Each 
+#   line corresponds to a unique layer. The 
+#   bottom layer is assumed to be a half-space
+#   (Thickness is irrelevant).
+#
+#   Format:
+#       Column  Contents
+#          0    Thickness (km)
+#          1    Density (kg/m^3)
+#          2    Layer P-wave velocity (km/s)
+#          3    Layer S-wave velocity (km/s)
+#          4    Layer flag 
+#                   iso: isotropic
+#                   tri: transverse isotropy
+#                   [other]: other minerals or rocks
+#          5    % Transverse anisotropy (if Layer is set to 'tri')
+#                   0: isotropic
+#                   +: fast symmetry axis
+#                   -: slow symmetry axis
+#          6    Trend of symmetry axis (degrees)
+#          7    Plunge of symmetry axis (degrees)
+#
+################################################
+4   2800    5.0  2.80    iso  0.  0.  0.
+4   2800    5.31 2.975   iso  0.  0.  0.
+4   2800    5.62 3.15    iso  0.  0.  0.
+4   2800    5.93 3.325   iso  0.  0.  0.
+4   2800    6.24 3.5     iso  0.  0.  0.
+4   2800    6.55 3.675   iso  0.  0.  0.
+4   2800    6.86 3.85    iso  0.  0.  0.
+4   2800    7.17 4.025   iso  0.  0.  0.
+4   2800    7.48 4.2     iso  0.  0.  0.
+4   2800    7.79 4.375   iso  0.  0.  0.
+0   3200    8.1  4.55    iso  0.  0.  0.
