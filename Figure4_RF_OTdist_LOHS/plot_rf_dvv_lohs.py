@@ -34,6 +34,8 @@ def main():
 	# Parameters for optimal transport
 	m=0.95
 
+	sign=False
+
 	# horizontal slowness (ray parameter) in s/km
 	perts = np.linspace(dvlim[0], dvlim[1], 11)
 
@@ -77,6 +79,11 @@ def main():
 		valid_inds = np.sum(p,axis=0)!=0
 
 		# ----- Calculate the OT dist -----
+		if sign:
+			dt_sign=np.sign(t_axis[t_inds,np.newaxis]-t_axis[np.newaxis,t_inds])
+			da_sign=np.sign(rf_cur[:,1,np.newaxis]-rf_ref[np.newaxis,:,1])
+			M_t*=dt_sign
+			M_a*=da_sign
 		d_t=np.sum(p*M_t,axis=0)
 		d_a=np.sum(p*M_a,axis=0)
 		d=np.sum(p*M_tlp,axis=0)
@@ -85,7 +92,10 @@ def main():
 		if pert==0:
 			c='k'
 		else:
-			c=cm.inferno(i/len(perts))
+			if sign:
+				c=cm.coolwarm(i/len(perts))
+			else:
+				c=cm.inferno(i/len(perts))
 
 		axs[0].plot(t_axis[t_inds], rfs_pert[i, t_inds], c=c, lw=2)
 		axs[1].plot(t_axis[t_inds][valid_inds], d_t[valid_inds], c=c, lw=2)
