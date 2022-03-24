@@ -31,8 +31,9 @@ def main():
     p3.append(curved_surf(p3[0],p3[1]))
 
     # plot random points
-    x_rand=1.5*np.random.randn(5000)+p1[0]
-    y_rand=np.random.randn(5000)+p1[1]
+    npts_rand=5000
+    x_rand=1.5*np.random.randn(npts_rand)+p1[0]
+    y_rand=np.random.randn(npts_rand)+p1[1]
     valid_pts = (x_rand>x[0]) & (x_rand<x[-1]) & (y_rand>y[0]) & (y_rand<y[-1])
     # on the surface
     ax.scatter(x_rand[valid_pts], y_rand[valid_pts], curved_surf(x_rand[valid_pts], y_rand[valid_pts]), c='k', s=1, alpha=0.2, zorder=0)
@@ -60,13 +61,13 @@ def main():
 
     x13=np.linspace(p1[0],p3[0],50)
     y13=np.linspace(p1[1],p3[1],50)
-    ax.plot(x13,y13,curved_surf(x13,y13),c='crimson', zorder=3)
-    ax.plot(x13,y13,0,c='crimson', zorder=3)
+    ax.plot(x13,y13,curved_surf(x13,y13),c='springgreen', zorder=3)
+    ax.plot(x13,y13,0,c='springgreen', zorder=3)
 
     x23=np.linspace(p2[0],p3[0],50)
     y23=np.linspace(p2[1],p3[1],50)
-    ax.plot(x23,y23,curved_surf(x23,y23),c='crimson', zorder=3)
-    ax.plot(x23,y23,0,c='crimson', zorder=3)
+    ax.plot(x23,y23,curved_surf(x23,y23),c='dodgerblue', zorder=3)
+    ax.plot(x23,y23,0,c='dodgerblue', zorder=3)
 
     ax.set_zlim(0, np.max(Z_surf))
     ax.set_axis_off()
