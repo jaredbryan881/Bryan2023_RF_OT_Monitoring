@@ -11,10 +11,10 @@ import sys
 sys.path.append("../")
 from sim_synth import simulate_RF
 from distance_matrix import distance_matrix_1d
-from ot_distance import partial_ot_dist_tlp, ot_dist_tlp
+from ot_distance import partial_ot_dist_tlp
 
 def main():
-	# Show the transport map for a range of masses
+	# Show the transport map for a range of time-amplitude scalings
 
 	# define parameters
 	modfile = '../velocity_models/model_lohs.txt'
@@ -27,10 +27,10 @@ def main():
 	tlim = [-1.0, 10.0] # time window
 	t_inds = (t_axis >= tlim[0]) & (t_axis < tlim[1]) # corresponding indices
 	npts_win = np.sum(t_inds)
-	flim = 1.0 # bandpass frequencies
+	flim = 1.0 # lowpass frequency
 	slow = 0.05 # slowness
 	pert = -0.02
-	masses = [0.9,0.95]
+	mass=0.95
 
 	save_fig=False
 
@@ -55,50 +55,34 @@ def main():
 
 	M_t = distance_matrix_1d(t_axis[t_inds,np.newaxis], t_axis[t_inds,np.newaxis])
 	M_a = distance_matrix_1d(rf_ref[t_inds,np.newaxis], rf_pert[t_inds,np.newaxis])
-	M_tlp = M_t + t_weight*M_a
 
 	# Individual RFs
 	fig,axs=plt.subplots(3,1,sharex=True,sharey=True, figsize=(15,8))
 
-	for (m,mass) in enumerate(masses):
-		print("--Mass={}".format(mass))
+	lambs = t_weight*np.array([0,1,10])
+	for (l,lamb) in enumerate(lambs):
+		print("Lambda={}".format(lamb))
 
-		# Stacked TLp
+		M_tlp = M_t + lamb*M_a
 		ot_map = partial_ot_dist_tlp(M_tlp, m=mass)
 
-		# source distribution and transport vectors
-		axs[m].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec='k', s=40)
-		axs[m].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec='k', s=40)
+		axs[l].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
+		axs[l].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
+
 		# iterate over times in first RF dist
 		for i in range(npts_win):
 			if np.sum(ot_map[i]==1)!=0:
 				# coords of the source point
 				vector_x = t_axis[t_inds][ot_map[i]==1]-t_axis[t_inds][i]
 				vector_y = rf_pert[t_inds][ot_map[i]==1]-rf_ref[t_inds][i]
-				axs[m].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], c='k')
-
-	# Full OT for mass=1.0
-	print("--Mass=1.0")
-	_,ot_map = ot_dist_tlp(M_tlp)
-	dists = np.mean(ot_map*M_tlp,axis=0)
-	# source distribution and transport vectors
-	axs[len(masses)].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec='k', s=40)
-	axs[len(masses)].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec='k', s=40)
-	# iterate over times in first RF dist
-	for i in range(npts_win):
-		if np.sum(ot_map[i]==1)!=0:
-			# coords of the source point
-			vector_x = t_axis[t_inds][ot_map[i]==1]-t_axis[t_inds][i]
-			vector_y = rf_pert[t_inds][ot_map[i]==1]-rf_ref[t_inds][i]
-			axs[len(masses)].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], c='k')
+				axs[l].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], c='k')
 
 	plt.subplots_adjust(hspace=0)
 	plt.tight_layout()
 	axs[0].set_xlim(-1,10)
 
 	if save_fig:
-		plt.savefig("ot_match_{}.pdf".format(mass))
-		plt.savefig("ot_match_{}.png".format(mass))
+		plt.savefig("FigureA1_varyScaling.pdf")
 	plt.show()
 
 
