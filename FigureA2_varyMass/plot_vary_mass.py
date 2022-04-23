@@ -32,7 +32,7 @@ def main():
 	pert = -0.02
 	masses = [0.9,0.95]
 
-	save_fig=False
+	save_fig=True
 
 	# load model
 	ref_model = ut.read_model(modfile)
@@ -93,8 +93,18 @@ def main():
 			axs[len(masses)].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], c='k')
 
 	plt.subplots_adjust(hspace=0)
-	plt.tight_layout()
 	axs[0].set_xlim(-1,10)
+	axs[0].set_yticks([-0.01,0.00,0.01,0.02,0.03])
+	axs[1].set_yticks([-0.01,0.00,0.01,0.02,0.03])
+	axs[2].set_yticks([-0.01,0.00,0.01,0.02,0.03])
+	axs[2].set_xticks([-1,0,1,2,3,4,5,6,7,8,9,10])
+	axs[2].set_xlabel("Time [s]", fontsize=12)
+	plt.xticks(fontsize=12)
+	axs[0].yaxis.set_tick_params(labelsize=12)
+	axs[1].yaxis.set_tick_params(labelsize=12)
+	axs[2].yaxis.set_tick_params(labelsize=12)
+
+	plt.tight_layout()
 
 	if save_fig:
 		plt.savefig("FigureA2_varyMass.pdf")
