@@ -283,7 +283,7 @@ def main():
 		# ----------------
 		# PLOT OT DISTANCE
 		# ----------------
-		f_dist, = axs[1].plot(t_axis[t_inds], d_t, linewidth=2.5, alpha=1.0, c=cmap(0.0))
+		f_dist, = axs[1].plot(t_axis[t_inds][valid_inds], d_t[valid_inds], linewidth=2.5, alpha=1.0, c=cmap(0.0))
 
 		current_plots_dist.append(f_dist)
 		if len(current_plots_dist) > n_lines:
