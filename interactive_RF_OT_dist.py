@@ -76,6 +76,7 @@ def main():
 	axs[0].set_ylim(-0.02, 0.05)
 
 	axs[1].set_ylim(-0.001,0.002)
+	axs[1].set_ylabel(r"$\sum_{i}c^t_{ij}\gamma_{ij}$", fontsize=14)
 
 	# ------------------------
 	# PLOT MEDIUM AND RECEIVER
