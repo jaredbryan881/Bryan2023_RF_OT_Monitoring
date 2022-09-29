@@ -140,5 +140,30 @@ def main():
 		plt.savefig("Reconstructed_ICs.pdf")
 	plt.show()
 
+	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
+	for i in range(ncomp):
+		axs[i,0].scatter(slows, ica.components_[i], c=cm.coolwarm((perts_s+0.02)/0.04), s=5, alpha=0.5)
+		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
+
+		axs[i,1].scatter(perts_s, ica.components_[i], c=cm.inferno((slows-0.04)/0.02), s=5, alpha=0.5)
+
+	axs[-1,0].set_xlabel("Slowness", fontsize=14)
+	axs[-1,1].set_xlabel(r"$dV_s/V_s$", fontsize=14)
+	plt.show()
+
+
+	ica = FastICA(n_components=ncomp)
+	S = ica.fit_transform(rfs_pert.T)
+	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
+	for i in range(ncomp):
+		axs[i,0].scatter(slows, ica.components_[i], c=cm.coolwarm((perts_s+0.02)/0.04), s=5, alpha=0.5)
+		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
+
+		axs[i,1].scatter(perts_s, ica.components_[i], c=cm.inferno((slows-0.04)/0.04), s=5, alpha=0.5)
+
+	axs[-1,0].set_xlabel("Slowness", fontsize=14)
+	axs[-1,1].set_xlabel(r"$dV_s/V_s$", fontsize=14)
+	plt.show()
+
 if __name__=="__main__":
 	main()
