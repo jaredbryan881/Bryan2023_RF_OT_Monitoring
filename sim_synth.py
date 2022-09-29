@@ -1,7 +1,7 @@
 import numpy as np
 from telewavesim import utils as ut
 
-def simulate_RF(model, slow, baz, npts, dt, wvtype='P', obs=False, freq=None, vels=None, len_factor=1):
+def simulate_RF(model, slow, baz, npts, dt, wvtype='P', obs=False, freq=None, vels=None, len_factor=1, noise=None):
 	"""
 	Simulate the propagation of a plane wave through a stack of layers and calculate the resulting (radial) receiver function.
 
@@ -49,6 +49,9 @@ def simulate_RF(model, slow, baz, npts, dt, wvtype='P', obs=False, freq=None, ve
 	else:
 		# don't rotate
 		tfs = ut.tf_from_xyz(trxyz, pvh=False)
+
+	if noise is not None:
+		tfs[0].data+=noise
 
 	# get receiver function by lowpass filtering transfer function
 	if freq is not None:
