@@ -1,0 +1,145 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import copy
+import time
+
+from scipy.stats import gaussian_kde
+from scipy.interpolate import interp1d
+
+from telewavesim import utils as ut
+
+import sys
+sys.path.append("../")
+from sim_synth import simulate_RF
+
+import ot
+
+def main():
+	linearization_error_RFs()
+
+def linearization_error_RFs():
+	# ----- Define parameters -----
+	# Parameters for raw synthetic RFs
+	modfile='../velocity_models/model_lohs.txt'
+	wvtype='P' # incident wave type
+	npts=8193 # Number of samples
+	dt=0.05 # time discretization
+	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
+	plim=[0.04,0.08] # slowness limits
+
+	np.random.seed(0)
+
+	# Parameters for processed synthetic RFs
+	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
+	tlim = [-1.0, 10.0] # time window
+	t_inds = (t_axis >= tlim[0]) & (t_axis < tlim[1]) # corresponding indices
+	npts_win = np.sum(t_inds) # number of points in the time window
+	flim = 1.0 # bandpass frequencies
+
+	# Parameters for RF ensemble & noise
+	n_rfs = 100 # number of RFs in the synthetic distributions
+	noise_level=0.0 # fraction of the range used for additive Gaussian noise
+
+	# Parameters for optimal transport
+	m=0.95
+
+	save_figs=False
+
+	# horizontal slowness (ray parameter) in s/km
+	slows = np.random.uniform(low=plim[0], high=plim[1], size=n_rfs)
+	perts_s = np.random.uniform(low=-0.05, high=0.05, size=n_rfs)
+
+	# ----- Calculate reference RF -----
+	# Load model and calculate RF
+	ref_model = ut.read_model(modfile)
+	rf_ref_ts = simulate_RF(ref_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
+
+	# Turn 1D reference RF into a 2D point cloud via a time-amplitude scaling
+	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
+	delta_a = np.max(rf_ref_ts)-np.min(rf_ref_ts)
+	t_weight = (delta_t/delta_a)
+	rf_ref = np.array([t_axis[t_inds], t_weight*rf_ref_ts[t_inds]]).T
+
+	# ----- Calculate ensemble of RFs -----
+	Vs=list()
+	rfs_pert = np.empty((n_rfs, npts))
+	for i in range(n_rfs):
+		# Get random slowness and Vs perturbation
+		slow = slows[i]
+		pert_s = perts_s[i]
+
+		# Get telewavesim model with given perturbation
+		pert_model = copy.deepcopy(ref_model)
+		pert_model.vs[0]*=(1+pert_s)
+		pert_model.update_tensor()
+
+		# Calculate the RF and add noise
+		rf_pert = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
+		amax = np.max(np.abs(rf_pert))
+		sigma=amax*noise_level
+		noise = np.random.normal(loc=0.0, scale=sigma, size=npts)
+		rfs_pert[i] = rf_pert + noise
+
+		# Turn 1D RF into 2D point cloud
+		rf_cur = np.array([t_axis[t_inds], t_weight*rfs_pert[i,t_inds]]).T
+
+		# ----- Calculate the LOT embedding -----
+		C=ot.dist(rf_cur, rf_ref, metric='euclidean') # GSOT distance matrix
+		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
+		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
+		p=ot.partial.partial_wasserstein(a,b,C,m=m)
+		
+		Vi=(np.matmul((npts_win*p).T,rf_cur)-rf_ref)#/np.sqrt(npts_win)
+
+		# Find indices that mapped to the dummy points and set to NaN
+		# We'll treat these as missing observations during the LOT section
+		pruned_inds=np.sum(p,axis=0)==0
+		Vi[pruned_inds,:]=np.nan
+
+		Vs.append(Vi)
+	Vs=np.asarray(Vs)
+
+	# Calculate the distance matrix
+	ind=0
+	d_lot=np.zeros(int(n_rfs*(n_rfs-1)/2))
+	d_ot=np.zeros(int(n_rfs*(n_rfs-1)/2))
+
+	for i in range(n_rfs):
+		print(i)
+		rf1=np.array([t_axis[t_inds], t_weight*rfs_pert[i,t_inds]]).T
+		for j in range(i+1,n_rfs):
+			rf2=np.array([t_axis[t_inds], t_weight*rfs_pert[j,t_inds]]).T
+
+			# calculate the OT distance directly
+			C=ot.dist(rf1, rf2, metric='euclidean') # GSOT distance matrix
+			a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
+			b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
+			p=ot.partial.partial_wasserstein(a,b,C,m=m)
+			d_ot[ind]=np.sum(p*C)
+
+			# calculate the OT distance in the embedding space
+			V_diff=Vs[j]-Vs[i]
+			d_lot[ind]=np.sqrt(np.nansum((V_diff/np.sqrt(npts_win))**2))
+
+			ind+=1
+
+	fig,axs=plt.subplots(2,1)
+	dist_dens=np.vstack([d_ot,d_lot])
+	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
+	axs[0].plot(d_ot, d_ot, c='crimson', linestyle='--', lw=2)
+	axs[0].scatter(d_ot, d_lot, c=cm.inferno(dist_dens_c/dist_dens_c.max()))
+	axs[0].set_xlabel(r"$d_{OT}$", fontsize=12)
+	axs[0].set_ylabel(r"$d_{LOT}$", fontsize=12)
+
+	error=(d_lot-d_ot)/d_ot
+	error_dens=np.vstack([d_ot, error])
+	error_dens_c = gaussian_kde(error_dens)(error_dens)
+	axs[1].plot(d_ot, d_ot-d_ot, c='crimson', linestyle='--', lw=2)
+	axs[1].scatter(d_ot, error*100, c=cm.inferno(error_dens_c/error_dens_c.max()))
+	axs[1].set_xlabel(r"$d_{OT}$", fontsize=12)
+	axs[1].set_ylabel("error [%]", fontsize=12)
+	plt.show()
+
+if __name__=="__main__":
+	main()
