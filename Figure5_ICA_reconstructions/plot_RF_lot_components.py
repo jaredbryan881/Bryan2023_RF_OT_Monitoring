@@ -23,7 +23,7 @@ def main():
 	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
 	plim=[0.04,0.06] # slowness limits
-	dvlim=[-0.02,0.02] # Vs perturbation limits
+	dvlim=[-0.05,0.05] # Vs perturbation limits
 
 	# Parameters for processed synthetic RFs
 	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
@@ -93,16 +93,13 @@ def main():
 
 		# Find indices that mapped to the dummy points and set to NaN
 		# We'll treat these as missing observations during the LOT section
-		pruned_tinds = np.isclose(Vi[:,0]+rf_ref[:,0], 0)
-		pruned_ainds = np.isclose(Vi[:,1]+rf_ref[:,1], 0)
-		pruned_inds = pruned_tinds & pruned_ainds
+		pruned_inds=np.sum(p,axis=0)==0
 		Vi[pruned_inds,:]=np.nan
 
 		V.append(Vi)
 	V=np.asarray(V)
 
 	# ----- Perform PPCA in the LOT embedding space -----
-	#ppca = PPCA(n_components=ncomp)
 	C, ss, M, X, Ye = ppca(V.reshape(n_rfs,-1), d=ncomp, dia=False)
 
 	# visuzalize the modes of variation back in waveform space
@@ -140,6 +137,8 @@ def main():
 		plt.savefig("Reconstructed_ICs.pdf")
 	plt.show()
 
+	# Plot mixing coefficients
+	# embedding space
 	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
 	for i in range(ncomp):
 		axs[i,0].scatter(slows, ica.components_[i], c=cm.coolwarm((perts_s+0.02)/0.04), s=5, alpha=0.5)
@@ -151,7 +150,7 @@ def main():
 	axs[-1,1].set_xlabel(r"$dV_s/V_s$", fontsize=14)
 	plt.show()
 
-
+	# waveform space
 	ica = FastICA(n_components=ncomp)
 	S = ica.fit_transform(rfs_pert.T)
 	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
