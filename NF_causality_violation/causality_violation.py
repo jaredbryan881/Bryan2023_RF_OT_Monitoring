@@ -5,6 +5,7 @@ import matplotlib.cm as cm
 
 from telewavesim import utils as ut
 
+from dtw import dtw
 import ot
 
 import sys
@@ -62,11 +63,19 @@ def main():
 	# solve OT problem
 	ot_map = partial_ot_dist_tlp(M_tlp, m=mass, nb_dummies=20)
 
+	# Solve the same problem with dynamic time warping
+	# show that the warping function enforces causality
+	l2_norm = lambda x, y: np.linalg.norm(x-y,ord=2)
+
+	d,cost_matrix,acc_cost_matrix,path = dtw(rf_ref[t_inds,np.newaxis], rf_pert[t_inds,np.newaxis], dist=l2_norm)
+
+
+
 	# Initialize plot
-	fig,axs=plt.subplots(1,1, figsize=(8,3))
+	fig,axs=plt.subplots(2,1, sharex=True, sharey=True, figsize=(10,6))
 	# plot RFs
-	axs.scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
-	axs.scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
+	axs[0].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
+	axs[0].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
 
 	# plot connections in the transport map
 	for i in range(npts_win):
@@ -76,19 +85,25 @@ def main():
 			vector_y = rf_pert[t_inds][ot_map[i]==1]-rf_ref[t_inds][i]
 
 			# plot connection
-			axs.plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], lw=1, c='k')
+			axs[0].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], lw=1, c='k')
+
+	axs[1].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
+	axs[1].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
+	for (p1,p2) in zip(path[0], path[1]):
+		axs[1].plot([t_axis[t_inds][p1], t_axis[t_inds][p2]], [rf_ref[t_inds][p1], rf_pert[t_inds][p2]], c='k', lw=1)
 
 	# make the plot nicer
-	axs.set_yticks([-0.01,0.00,0.01,0.02,0.03])
-	axs.yaxis.set_tick_params(labelsize=12)
-	axs.set_xlim(-1,10)
-	axs.set_xticks([i for i in range(-1, 11)])
-	axs.set_xlabel("Time [s]", fontsize=12)
+	axs[0].set_yticks([-0.01,0.00,0.01,0.02,0.03])
+	axs[0].yaxis.set_tick_params(labelsize=12)
+	axs[1].set_yticks([-0.01,0.00,0.01,0.02,0.03])
+	axs[1].yaxis.set_tick_params(labelsize=12)
+	axs[1].set_xlim(-1,10)
+	axs[1].set_xticks([i for i in range(-1, 11)])
+	axs[1].set_xlabel("Time [s]", fontsize=12)
 	plt.xticks(fontsize=12)
 	plt.subplots_adjust(hspace=0)
 	plt.tight_layout()
 	plt.show()
-
 
 if __name__=="__main__":
 	main()
