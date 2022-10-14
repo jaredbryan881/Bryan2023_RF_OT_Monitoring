@@ -17,8 +17,8 @@ from sklearn.decomposition import FastICA
 import ot
 
 def main():
-	#vary_slowness_vs()
-	vary_slowness_baz()
+	vary_slowness_vs()
+	#vary_slowness_baz()
 
 def vary_slowness_baz():
 	# ----- Define parameters -----
@@ -29,7 +29,7 @@ def vary_slowness_baz():
 	dt=0.05 # time discretization
 	bazlim=[0.0,360.0] # Back-azimuth direction in degrees (has no influence if model is isotropic)
 	plim=[0.04,0.08] # slowness limits
-	dvlim=[-0.02,0.02] # Vs perturbation limits
+	dvlim=[-0.05,0.05] # Vs perturbation limits
 
 	# Parameters for processed synthetic RFs
 	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
@@ -125,11 +125,11 @@ def vary_slowness_baz():
 	stds = np.std(A,0)
 	taus = np.linspace(-2,2,11)
 	fig,axs=plt.subplots(ncomp,1,figsize=(15,2.5*ncomp),sharex=True)
-	for i,vpca in enumerate(S.T):
-		Vpca=vpca.reshape(npts_win,2)
+	for i,vica in enumerate(S.T):
+		Vica=vica.reshape(npts_win,2)
 		axs[i].set_ylabel("IC #{}".format(i+1), fontsize=12)
 		for k,tau in enumerate(taus):
-			samples=rf_ref+tau*stds[i]*Vpca
+			samples=rf_ref+tau*stds[i]*Vica
 
 			if tau==0:
 				color='k'
@@ -149,12 +149,14 @@ def vary_slowness_baz():
 	# embedding space
 	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
 	for i in range(ncomp):
-		axs[i,0].scatter(slows, ica.components_[i], color=cm.twilight(baz/360), s=5, alpha=0.5)
+		axs[i,0].scatter(slows, ica.components_[i], color=cm.twilight(bazs/360), s=5, alpha=0.5)
 		axs[i,1].scatter(bazs, ica.components_[i], color=cm.inferno((slows-slows.min())/(slows.max()-slows.min())), s=5, alpha=0.5)
+		#axs[i,2].scatter(perts_s, ica.components_[i], color=cm.inferno((slows-slows.min())/(slows.max()-slows.min())), s=5, alpha=0.5)
 		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
 
 	axs[-1,0].set_xlabel("Slowness", fontsize=14)
 	axs[-1,1].set_xlabel("Backazimuth", fontsize=14)
+	#axs[-1,2].set_xlabel("dV/V", fontsize=14)
 	plt.show()
 
 	# waveform space
@@ -162,7 +164,7 @@ def vary_slowness_baz():
 	S = ica.fit_transform(rfs_pert.T)
 	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
 	for i in range(ncomp):
-		axs[i,0].scatter(slows, ica.components_[i], color=cm.twilight(baz/360), s=5, alpha=0.5)
+		axs[i,0].scatter(slows, ica.components_[i], color=cm.twilight(bazs/360), s=5, alpha=0.5)
 		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
 
 		axs[i,1].scatter(bazs, ica.components_[i], color=cm.inferno((slows-slows.min())/(slows.max()-slows.min())), s=5, alpha=0.5)
@@ -276,11 +278,11 @@ def vary_slowness_vs():
 	stds = np.std(A,0)
 	taus = np.linspace(-2,2,11)
 	fig,axs=plt.subplots(ncomp,1,figsize=(15,2.5*ncomp),sharex=True)
-	for i,vpca in enumerate(S.T):
-		Vpca=vpca.reshape(npts_win,2)
+	for i,vica in enumerate(S.T):
+		Vica=vica.reshape(npts_win,2)
 		axs[i].set_ylabel("IC #{}".format(i+1), fontsize=12)
 		for k,tau in enumerate(taus):
-			samples=rf_ref+tau*stds[i]*Vpca
+			samples=rf_ref+tau*stds[i]*Vica
 
 			if tau==0:
 				color='k'
