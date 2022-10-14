@@ -135,8 +135,8 @@ def vary_slowness_vs():
 	npts=8193 # Number of samples
 	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
-	plim=[0.04,0.08] # slowness limits
-	dvlim=[-0.05,0.05] # Vs perturbation limits
+	plim=[0.04,0.06] # slowness limits
+	dvlim=[-0.02,0.02] # Vs perturbation limits
 
 	# Parameters for processed synthetic RFs
 	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
@@ -150,7 +150,7 @@ def vary_slowness_vs():
 	noise_level=0.0 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
-	m=1.0
+	m=0.95
 
 	ncomp=2
 
