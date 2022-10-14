@@ -18,7 +18,7 @@ import ot
 
 def main():
 	vary_slowness_vs()
-	#vary_slowness_baz()
+	vary_slowness_baz()
 
 def vary_slowness_baz():
 	# ----- Define parameters -----
@@ -52,7 +52,6 @@ def vary_slowness_baz():
 	# horizontal slowness (ray parameter) in s/km
 	slows = np.random.uniform(low=plim[0], high=plim[1], size=n_rfs)
 	bazs = np.random.uniform(low=bazlim[0], high=bazlim[1], size=n_rfs)
-	perts_s = np.random.uniform(low=dvlim[0], high=dvlim[1], size=n_rfs)*0
 
 	# ----- Calculate reference RF -----
 	# Load model and calculate RF
@@ -71,21 +70,14 @@ def vary_slowness_baz():
 	# ----- Calculate ensemble of RFs -----
 	V=list()
 	rfs_pert = np.empty((n_rfs, npts))
-	for i in range(len(slows)):
-		print(i)
+	for i in range(n_rfs):
 		# Get random slowness and Vs perturbation
 		slow = slows[i]
 		baz  = bazs[i]
-		pert_s = perts_s[i]
-
-		# Get telewavesim model with given perturbation
-		pert_model = copy.deepcopy(ref_model)
-		pert_model.vs[0]*=(1+pert_s)
-		pert_model.update_tensor()
 
 		# Calculate the RF and add noise
 		noise = np.random.normal(loc=0.0, scale=sigma, size=npts)
-		rf_pert = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None, noise=noise).data
+		rf_pert = simulate_RF(ref_model, slow, baz, npts, dt, freq=flim, vels=None, noise=noise).data
 		rfs_pert[i] = rf_pert + noise
 
 		# Turn 1D RF into 2D point cloud
@@ -107,7 +99,6 @@ def vary_slowness_baz():
 	V=np.asarray(V)
 
 	# ----- Perform PPCA in the LOT embedding space -----
-	#ppca = PPCA(n_components=ncomp)
 	C, ss, M, X, Ye = ppca(V.reshape(n_rfs,-1), d=ncomp, dia=False)
 
 	# visuzalize the modes of variation back in waveform space
@@ -122,56 +113,19 @@ def vary_slowness_baz():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	stds = np.std(A,0)
-	taus = np.linspace(-2,2,11)
-	fig,axs=plt.subplots(ncomp,1,figsize=(15,2.5*ncomp),sharex=True)
-	for i,vica in enumerate(S.T):
-		Vica=vica.reshape(npts_win,2)
-		axs[i].set_ylabel("IC #{}".format(i+1), fontsize=12)
-		for k,tau in enumerate(taus):
-			samples=rf_ref+tau*stds[i]*Vica
+	plot_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim)
+	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness", "Backazimuth"], cmaps=[cm.twilight,cm.inferno])
 
-			if tau==0:
-				color='k'
-			else:
-				color=cm.coolwarm(k/len(taus))
 
-			axs[i].plot(samples[:,0], samples[:,1]/t_weight, lw=2, c=color)
-	axs[0].set_xlim(tlim[0], tlim[1])
-	axs[ncomp-1].set_xlabel("Time [s]", fontsize=12)
-	plt.tight_layout()
-	if save_figs:
-		plt.savefig("Reconstructed_ICs.png")
-		plt.savefig("Reconstructed_ICs.pdf")
-	plt.show()
-
-	# Plot mixing coefficients
-	# embedding space
-	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
-	for i in range(ncomp):
-		axs[i,0].scatter(slows, ica.components_[i], color=cm.twilight(bazs/360), s=5, alpha=0.5)
-		axs[i,1].scatter(bazs, ica.components_[i], color=cm.inferno((slows-slows.min())/(slows.max()-slows.min())), s=5, alpha=0.5)
-		#axs[i,2].scatter(perts_s, ica.components_[i], color=cm.inferno((slows-slows.min())/(slows.max()-slows.min())), s=5, alpha=0.5)
-		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
-
-	axs[-1,0].set_xlabel("Slowness", fontsize=14)
-	axs[-1,1].set_xlabel("Backazimuth", fontsize=14)
-	#axs[-1,2].set_xlabel("dV/V", fontsize=14)
-	plt.show()
-
-	# waveform space
+	# ----- Perform ICA in waveform space -----
 	ica = FastICA(n_components=ncomp)
-	S = ica.fit_transform(rfs_pert.T)
-	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
-	for i in range(ncomp):
-		axs[i,0].scatter(slows, ica.components_[i], color=cm.twilight(bazs/360), s=5, alpha=0.5)
-		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
+	# reconstruct signals
+	S = ica.fit_transform(rfs_pert[:,t_inds].T)
+	# get estimated mixing matrix
+	A = ica.mixing_
 
-		axs[i,1].scatter(bazs, ica.components_[i], color=cm.inferno((slows-slows.min())/(slows.max()-slows.min())), s=5, alpha=0.5)
-
-	axs[-1,0].set_xlabel("Slowness", fontsize=14)
-	axs[-1,1].set_xlabel("Backazimuth", fontsize=14)
-	plt.show()
+	plot_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)
+	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness", "Backazimuth"], cmaps=[cm.twilight, cm.inferno])
 
 def vary_slowness_vs():
 	# ----- Define parameters -----
@@ -181,8 +135,8 @@ def vary_slowness_vs():
 	npts=8193 # Number of samples
 	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
-	plim=[0.04,0.06] # slowness limits
-	dvlim=[-0.02,0.02] # Vs perturbation limits
+	plim=[0.04,0.08] # slowness limits
+	dvlim=[-0.05,0.05] # Vs perturbation limits
 
 	# Parameters for processed synthetic RFs
 	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
@@ -196,7 +150,7 @@ def vary_slowness_vs():
 	noise_level=0.0 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
-	m=0.95
+	m=1.0
 
 	ncomp=2
 
@@ -205,7 +159,6 @@ def vary_slowness_vs():
 	# horizontal slowness (ray parameter) in s/km
 	slows = np.random.uniform(low=plim[0], high=plim[1], size=n_rfs)
 	perts_s = np.random.uniform(low=dvlim[0], high=dvlim[1], size=n_rfs)
-	perts_p = np.random.uniform(low=dvlim[0], high=dvlim[1], size=n_rfs)*0
 
 	# ----- Calculate reference RF -----
 	# Load model and calculate RF
@@ -224,16 +177,14 @@ def vary_slowness_vs():
 	# ----- Calculate ensemble of RFs -----
 	V=list()
 	rfs_pert = np.empty((n_rfs, npts))
-	for i in range(len(slows)):
+	for i in range(n_rfs):
 		# Get random slowness and Vs perturbation
 		slow = slows[i]
 		pert_s = perts_s[i]
-		pert_p = perts_p[i]
 
 		# Get telewavesim model with given perturbation
 		pert_model = copy.deepcopy(ref_model)
 		pert_model.vs[0]*=(1+pert_s)
-		pert_model.vp[0]*=(1+pert_p)
 		pert_model.update_tensor()
 
 		# Calculate the RF and add noise
@@ -260,13 +211,7 @@ def vary_slowness_vs():
 	V=np.asarray(V)
 
 	# ----- Perform PPCA in the LOT embedding space -----
-	#ppca = PPCA(n_components=ncomp)
 	C, ss, M, X, Ye = ppca(V.reshape(n_rfs,-1), d=ncomp, dia=False)
-
-	# visuzalize the modes of variation back in waveform space
-	stds = np.std(X,0)
-	taus = np.linspace(-2,2,5)
-
 	# ----- Perform ICA in LOT embedding space using reconstructed data -----
 	# initialize ica object
 	ica = FastICA(n_components=ncomp)
@@ -275,55 +220,63 @@ def vary_slowness_vs():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
+	plot_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim)
+	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness", "dV/V"], cmaps=[cm.coolwarm,cm.inferno])
+
+
+	# ----- Perform ICA in waveform space -----
+	ica = FastICA(n_components=ncomp)
+	# reconstruct signals
+	S = ica.fit_transform(rfs_pert[:,t_inds].T)
+	# get estimated mixing matrix
+	A = ica.mixing_
+
+	plot_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)
+	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness", "dV/V"], cmaps=[cm.coolwarm, cm.inferno])
+
+def plot_signal_variation(A, S, t_weight, ref_signal, t_axis=None, ncomp=2, npts=220, tlim=[-1,10], foname=None):
+	# visuzalize the modes of variation back in waveform space
 	stds = np.std(A,0)
 	taus = np.linspace(-2,2,11)
 	fig,axs=plt.subplots(ncomp,1,figsize=(15,2.5*ncomp),sharex=True)
 	for i,vica in enumerate(S.T):
-		Vica=vica.reshape(npts_win,2)
+		if t_axis is not None:
+			pass
+		else:
+			vica=vica.reshape(npts,2)
+
 		axs[i].set_ylabel("IC #{}".format(i+1), fontsize=12)
 		for k,tau in enumerate(taus):
-			samples=rf_ref+tau*stds[i]*Vica
+			samples=ref_signal+tau*stds[i]*vica
 
-			if tau==0:
-				color='k'
+			color = 'k' if tau==0 else cm.coolwarm(k/len(taus))
+
+			if t_axis is not None:
+				axs[i].plot(t_axis, samples/t_weight, lw=2, c=color)
 			else:
-				color=cm.coolwarm(k/len(taus))
+				axs[i].plot(samples[:,0], samples[:,1]/t_weight, lw=2, c=color)
 
-			axs[i].plot(samples[:,0], samples[:,1]/t_weight, lw=2, c=color)
 	axs[0].set_xlim(tlim[0], tlim[1])
-	axs[ncomp-1].set_xlabel("Time [s]", fontsize=12)
+	axs[-1].set_xlabel("Time [s]", fontsize=12)
 	plt.tight_layout()
-	if save_figs:
-		plt.savefig("Reconstructed_ICs.png")
-		plt.savefig("Reconstructed_ICs.pdf")
+	if foname is not None:
+		plt.savefig(foname)
 	plt.show()
 
+def plot_ic_scatter(quants, ica, ncomp=2, labels=["Slowness", "dV/V"], cmaps=[cm.coolwarm, cm.inferno]):
 	# Plot mixing coefficients
 	# embedding space
+	Q=len(quants)
 	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
 	for i in range(ncomp):
-		axs[i,0].scatter(slows, ica.components_[i], c=cm.coolwarm((perts_s+0.02)/0.04), s=5, alpha=0.5)
-		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
-
-		axs[i,1].scatter(perts_s, ica.components_[i], c=cm.inferno((slows-0.04)/0.02), s=5, alpha=0.5)
-
-	axs[-1,0].set_xlabel("Slowness", fontsize=14)
-	axs[-1,1].set_xlabel(r"$dV_s/V_s$", fontsize=14)
+		for j in range(Q):
+			axs[i,j].scatter(quants[j], ica.components_[i], c=cmaps[j]((quants[Q-j-1]-quants[Q-j-1].min())/(quants[Q-j-1].max()-quants[Q-j-1].min())), s=5, alpha=0.5)
+			if j==0:
+				axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
+			if i==ncomp:
+				axs[-1,0].set_xlabel(labels[j], fontsize=14)
 	plt.show()
 
-	# waveform space
-	ica = FastICA(n_components=ncomp)
-	S = ica.fit_transform(rfs_pert.T)
-	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
-	for i in range(ncomp):
-		axs[i,0].scatter(slows, ica.components_[i], c=cm.coolwarm((perts_s+0.02)/0.04), s=5, alpha=0.5)
-		axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
-
-		axs[i,1].scatter(perts_s, ica.components_[i], c=cm.inferno((slows-0.04)/0.04), s=5, alpha=0.5)
-
-	axs[-1,0].set_xlabel("Slowness", fontsize=14)
-	axs[-1,1].set_xlabel(r"$dV_s/V_s$", fontsize=14)
-	plt.show()
 
 if __name__=="__main__":
 	main()
