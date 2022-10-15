@@ -7,24 +7,26 @@ import numpy as np
 import copy
 
 from distance_matrix import distance_matrix_1d
+from ot_distance import partial_ot_dist_tlp
 from sim_synth import simulate_RF
 
 import ot
 
 def main():
 	# define parameters
-	modfile = './velocity_models/model_lohs.txt' # layer-over-halfspace geometry
-	wvtype  = 'P'
-	npts    = 8193 # Number of samples
-	dt      = 0.05   # Sample distance in seconds
-	slow    = 0.06 # Horizontal slowness (or ray parameter) in s/km
-	baz     = 0.0   # Back-azimuth direction in degrees (has no influence if model is isotropic)
-	t_axis  = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
-	tlim    = [-1.0, 10.0] # time window
-	t_inds  = (t_axis >= tlim[0]) & (t_axis < tlim[1])
-	flim    = 1.0 # bandpass frequencies
-	m       = 0.90 # partial OT mass
-	cmap    = cm.inferno
+	modfile  = './velocity_models/model_lohs.txt' # layer-over-halfspace geometry
+	wvtype   = 'P'
+	npts     = 8193 # Number of samples
+	dt       = 0.05   # Sample distance in seconds
+	slow     = 0.06 # Horizontal slowness (or ray parameter) in s/km
+	baz      = 0.0   # Back-azimuth direction in degrees (has no influence if model is isotropic)
+	t_axis   = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
+	tlim     = [-1.0, 10.0] # time window
+	t_inds   = (t_axis >= tlim[0]) & (t_axis < tlim[1])
+	npts_win = np.sum(t_inds)
+	flim     = 1.0 # bandpass frequencies
+	m        = 0.90 # partial OT mass
+	cmap     = cm.inferno
 
 	# load model
 	ref_model = ut.read_model(modfile)
@@ -66,12 +68,16 @@ def main():
 	# initialize plotting cache
 	current_plots_rf   = []
 	current_plots_dist = []
+	current_plots_map  = []
 
 	# -----------------
 	# PLOT REFERENCE RF
 	# -----------------
-	f_d, = axs[0].plot(t_axis, ref_rf, linewidth=2.5, alpha=1.0, c=cmap(0.0))
-	current_plots_rf.append(f_d)
+	f_dref, = axs[0].plot(t_axis[t_inds], ref_rf[t_inds], linewidth=2.5, alpha=1.0, c=cmap(0.0))
+	f_dpert, = axs[0].plot(t_axis[t_inds], ref_rf[t_inds], linewidth=2.5, alpha=1.0, c=cmap(0.0))
+	current_plots_rf.append(f_dref)
+	current_plots_rf.append(f_dpert)
+
 	axs[0].set_xlim(tlim[0], tlim[1])
 	axs[0].set_ylim(-0.02, 0.05)
 
@@ -166,6 +172,11 @@ def main():
 	axs[1].set_xlim(tlim[0], tlim[1])
 	axs[1].set_xlabel("Time [s]")
 
+	# initialize OT map plot
+	for i in range(npts_win):
+		f_m, = axs[0].plot([t_axis[t_inds][i], t_axis[t_inds][i]], [ref_rf[t_inds][i], ref_rf[t_inds][i]], linewidth=1.0, alpha=0.5, c='r')
+		current_plots_map.append(f_m)
+
 	# cache length for lines plotted
 	n_lines = 25
 
@@ -182,24 +193,8 @@ def main():
 		# -----------------
 		# PLOT PERTURBED RF
 		# -----------------
-		f_cur, = axs[0].plot(t_axis, pert_rf, linewidth=2.5)
-		current_plots_rf.append(f_cur)
-
-		# Update colors and transparencies of cached RFs
-		# Remove RFs once they exceed the cache length
-		if len(current_plots_rf) > n_lines:
-			current_plots_rf[0].remove()
-			current_plots_rf.remove(current_plots_rf[0])
-
-			for i in range(len(current_plots_rf)):
-				current_plots_rf[i].set_alpha(i/len(current_plots_rf))
-				current_plots_rf[i].set_color(cmap(1-i/len(current_plots_rf)))
-		else:
-			interval_places = np.linspace(1.0 - (len(current_plots_rf)/n_lines),1.0,len(current_plots_rf))
-
-			for i in range(len(current_plots_rf)):
-				current_plots_rf[i].set_alpha(interval_places[i])
-				current_plots_rf[i].set_color(cmap(1-interval_places[i]))
+		axs[0].plot(t_axis[t_inds], ref_rf[t_inds], linewidth=2.5, c='k')
+		f_dpert.set_data(t_axis[t_inds], pert_rf[t_inds])
 
 		# ---------------------
 		# PLOT PLANAR WAVEFRONT
@@ -263,42 +258,37 @@ def main():
 		PsSs_low.set_data([PsSs_low_x,recv_loc[0]-3*dx_s], [PsSs_low_y,layer_thickness])
 
 		# Calculate the amplitude distance matrix
-		M_a = distance_matrix_1d(pert_rf[t_inds,np.newaxis], ref_rf[t_inds,np.newaxis])
-		# Weighted combination of the time and amplitude distances
-		M_tlp = M_t + s_lamb.val*lamb*M_a
-
+		ref_rf_arr  = np.array([t_axis[t_inds], (s_lamb.val*lamb)*ref_rf[t_inds]]).T
+		pert_rf_arr = np.array([t_axis[t_inds], (s_lamb.val*lamb)*pert_rf[t_inds]]).T
+		
 		# ----- Calculate the OT plan -----
-		a=np.ones((ntimes,))/float(ntimes) # uniform distribution over reference points
-		b=np.ones((ntimes,))/float(ntimes) # uniform distribution over current points
-		p=ot.partial.partial_wasserstein(a,b,M_tlp,m=s_m.val)
+		M_tlp = distance_matrix_1d(ref_rf_arr,pert_rf_arr)
+		p=partial_ot_dist_tlp(M_tlp, m=s_m.val, nb_dummies=20)
 
 		# distances unaffected by partial OT
 		valid_inds = np.sum(p,axis=0)!=0
 
 		# Integrate the OT dist over amplitude to give a time series of distances
-		d_t=np.sum(p*M_t,axis=0)
-		d_a=np.sum(p*M_a,axis=0)
-		d=np.sum(p*M_tlp,axis=0)
+		d_t = np.sum(p*M_t,axis=0)
+		d   = np.sum(p*M_tlp,axis=0)
+
+		# -----------
+		# PLOT OT MAP
+		# -----------
+		# iterate over times in first RF dist
+		for i in range(npts_win):
+			if np.sum(p[i]*npts_win==1)!=0:
+				# coords of the source point
+				vector_x = t_axis[t_inds][p[i]*npts_win==1]-t_axis[t_inds][i]
+				vector_y = pert_rf[t_inds][p[i]*npts_win==1]-ref_rf[t_inds][i]
+				
+				current_plots_map[i].set_data([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x[0]], 
+											  [ref_rf[t_inds][i], ref_rf[t_inds][i]+vector_y[0]])
 
 		# ----------------
 		# PLOT OT DISTANCE
 		# ----------------
-		f_dist, = axs[1].plot(t_axis[t_inds][valid_inds], d_t[valid_inds], linewidth=2.5, alpha=1.0, c=cmap(0.0))
-
-		current_plots_dist.append(f_dist)
-		if len(current_plots_dist) > n_lines:
-			current_plots_dist[0].remove()
-			current_plots_dist.remove(current_plots_dist[0])
-
-			for i in range(len(current_plots_dist)):
-				current_plots_dist[i].set_alpha(i/len(current_plots_dist))
-				current_plots_dist[i].set_color(cmap(1-i/len(current_plots_dist)))
-		else:
-			interval_places = np.linspace(1.0 - (len(current_plots_dist)/n_lines),1.0,len(current_plots_dist))
-
-			for i in range(len(current_plots_dist)):
-				current_plots_dist[i].set_alpha(interval_places[i])
-				current_plots_dist[i].set_color(cmap(1-interval_places[i]))
+		f_dist.set_data(t_axis[t_inds][valid_inds], d_t[valid_inds])
 
 		fig.canvas.draw_idle()
 
