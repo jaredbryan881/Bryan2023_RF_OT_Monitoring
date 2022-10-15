@@ -58,10 +58,10 @@ def partial_ot_dist_tlp(M, dist1=None, dist2=None, m=0.99, numItermax=100000, nb
 	"""
 	# calculate optimal mapping
 	if dist1 is None:
-		dist1 = np.ones(M.shape[0])
+		dist1 = np.ones(M.shape[0])/M.shape[0]
 	if dist2 is None:
-		dist2 = np.ones(M.shape[1])
+		dist2 = np.ones(M.shape[1])/M.shape[1]
 
-	ot_map = ot.partial.partial_wasserstein(dist1, dist2, M, m=m*np.sum(dist1), numItermax=numItermax, nb_dummies=nb_dummies)
+	ot_map = ot.partial.partial_wasserstein(dist1, dist2, M, m=m, numItermax=numItermax, nb_dummies=nb_dummies)
 
 	return ot_map
