@@ -58,6 +58,15 @@ def vary_slowness_baz():
 	ref_model = ut.read_model(modfile)
 	rf_ref_ts = simulate_RF(ref_model, np.mean(slows), np.mean(bazs), npts, dt, freq=flim, vels=None).data
 
+	# ----- Plot real forms of variation -----
+	rfs_slow = np.zeros((11, npts))
+	rfs_baz = np.zeros((11, npts))
+	for (i,slow) in enumerate(np.linspace(plim[0], plim[1], 11)):
+		rfs_slow[i] = simulate_RF(ref_model, slow, np.mean(bazs), npts, dt, freq=flim, vels=None).data
+	for (i,baz) in enumerate(np.linspace(bazlim[0], bazlim[1]/2, 11)):
+		rfs_baz[i] = simulate_RF(ref_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
+	plot_true_signal_variation(rfs_slow, rfs_baz, t_axis, t_inds, foname="./figs/baz_slow/RF_true_signal_variation_bazslow.pdf")
+
 	amax = np.max(np.abs(rf_ref_ts))
 	sigma=amax*noise_level
 
@@ -113,8 +122,8 @@ def vary_slowness_baz():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim)
-	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness", "Backazimuth"], cmaps=[cm.twilight,cm.inferno])
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/baz_slow/embedding/RF_ICA_bazslow_embedding.pdf")
+	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness [s/deg]", "Backazimuth [deg]"], cmaps=[cm.twilight,cm.inferno])
 
 
 	# ----- Perform ICA in waveform space -----
@@ -124,8 +133,8 @@ def vary_slowness_baz():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)
-	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness", "Backazimuth"], cmaps=[cm.twilight, cm.inferno])
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/baz_slow/embedding/RF_ICA_bazslow_waveform.pdf")
+	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness [s/deg]", "Backazimuth [deg]"], cmaps=[cm.twilight, cm.inferno])
 
 def vary_slowness_vs():
 	# ----- Define parameters -----
@@ -164,6 +173,18 @@ def vary_slowness_vs():
 	# Load model and calculate RF
 	ref_model = ut.read_model(modfile)
 	rf_ref_ts = simulate_RF(ref_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
+
+	# ----- Plot real forms of variation -----
+	rfs_slow = np.zeros((11, npts))
+	rfs_pert = np.zeros((11, npts))
+	for (i,slow) in enumerate(np.linspace(plim[0], plim[1], 11)):
+		rfs_slow[i] = simulate_RF(ref_model, slow, baz, npts, dt, freq=flim, vels=None).data
+	for (i,pert_s) in enumerate(np.linspace(dvlim[0], dvlim[1], 11)):
+		pert_model = copy.deepcopy(ref_model)
+		pert_model.vs[0]*=(1+pert_s)
+		pert_model.update_tensor()
+		rfs_pert[i] = simulate_RF(pert_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
+	plot_true_signal_variation(rfs_slow, rfs_pert, t_axis, t_inds, foname="./figs/pert_slow/RF_true_signal_variation_pertslow.pdf")
 
 	amax = np.max(np.abs(rf_ref_ts))
 	sigma=amax*noise_level
@@ -220,8 +241,8 @@ def vary_slowness_vs():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim)
-	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness", "dV/V"], cmaps=[cm.coolwarm,cm.inferno])
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_embedding.pdf")
+	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness [s/deg]", r"$dV_S/V_S$"], cmaps=[cm.coolwarm,cm.inferno])
 
 
 	# ----- Perform ICA in waveform space -----
@@ -231,13 +252,39 @@ def vary_slowness_vs():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)
-	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness", "dV/V"], cmaps=[cm.coolwarm, cm.inferno])
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_waveform.pdf")
+	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness [s/deg]", r"$dV_S/V_S$"], cmaps=[cm.coolwarm, cm.inferno])
 
-def plot_signal_variation(A, S, t_weight, ref_signal, t_axis=None, ncomp=2, npts=220, tlim=[-1,10], foname=None):
+def plot_true_signal_variation(rf1, rf2, t_axis, t_inds, foname=None):
+	fig,axs=plt.subplots(2,1,figsize=(15,5), sharex=True)
+	for i in range(11):
+		if i==5:
+			c='k'
+		else:
+			c=cm.coolwarm(i/11)
+		axs[0].plot(t_axis[t_inds], rf1[i,t_inds], c=c, lw=2)
+		axs[1].plot(t_axis[t_inds], rf2[i,t_inds], c=c, lw=2)
+
+	for ax in axs:
+		for axis in ['top', 'bottom', 'left', 'right']:
+			ax.spines[axis].set_linewidth(1.0)
+			ax.tick_params(axis='both', which='major', labelsize=12)
+
+	axs[1].set_xlim(t_axis[t_inds][0], t_axis[t_inds][-1])
+	axs[1].set_xlabel("Time [s]", fontsize=16)
+
+	if foname is not None:
+		plt.savefig(foname)
+		plt.close()
+	else:
+		plt.show()
+
+
+def plot_ICA_signal_variation(A, S, t_weight, ref_signal, t_axis=None, ncomp=2, npts=220, tlim=[-1,10], foname=None):
 	# visuzalize the modes of variation back in waveform space
 	stds = np.std(A,0)
 	taus = np.linspace(-2,2,11)
+	mcs = np.linspace(np.min(A,0), np.max(A,0), 11)
 	fig,axs=plt.subplots(ncomp,1,figsize=(15,2.5*ncomp),sharex=True)
 	for i,vica in enumerate(S.T):
 		if t_axis is not None:
@@ -245,9 +292,10 @@ def plot_signal_variation(A, S, t_weight, ref_signal, t_axis=None, ncomp=2, npts
 		else:
 			vica=vica.reshape(npts,2)
 
-		axs[i].set_ylabel("IC #{}".format(i+1), fontsize=12)
+		axs[i].set_ylabel("IC #{}".format(i+1), fontsize=16)
 		for k,tau in enumerate(taus):
-			samples=ref_signal+tau*stds[i]*vica
+			#samples=ref_signal+tau*stds[i]*vica
+			samples=ref_signal+mcs[k,i]*vica
 
 			color = 'k' if tau==0 else cm.coolwarm(k/len(taus))
 
@@ -256,14 +304,21 @@ def plot_signal_variation(A, S, t_weight, ref_signal, t_axis=None, ncomp=2, npts
 			else:
 				axs[i].plot(samples[:,0], samples[:,1]/t_weight, lw=2, c=color)
 
+	for ax in axs:
+		for axis in ['top', 'bottom', 'left', 'right']:
+			ax.spines[axis].set_linewidth(1.0)
+			ax.tick_params(axis='both', which='major', labelsize=16)
+
 	axs[0].set_xlim(tlim[0], tlim[1])
-	axs[-1].set_xlabel("Time [s]", fontsize=12)
+	axs[-1].set_xlabel("Time [s]", fontsize=16)
 	plt.tight_layout()
 	if foname is not None:
 		plt.savefig(foname)
-	plt.show()
+		plt.close()
+	else:
+		plt.show()
 
-def plot_ic_scatter(quants, ica, ncomp=2, labels=["Slowness", "dV/V"], cmaps=[cm.coolwarm, cm.inferno]):
+def plot_ic_scatter(quants, ica, ncomp=2, labels=["Slowness [s/deg]", r"$dV_S/V_S$"], cmaps=[cm.coolwarm, cm.inferno], foname=None):
 	# Plot mixing coefficients
 	# embedding space
 	Q=len(quants)
@@ -272,10 +327,21 @@ def plot_ic_scatter(quants, ica, ncomp=2, labels=["Slowness", "dV/V"], cmaps=[cm
 		for j in range(Q):
 			axs[i,j].scatter(quants[j], ica.components_[i], c=cmaps[j]((quants[Q-j-1]-quants[Q-j-1].min())/(quants[Q-j-1].max()-quants[Q-j-1].min())), s=5, alpha=0.5)
 			if j==0:
-				axs[i,0].set_ylabel("IC {}".format(i), fontsize=14)
+				axs[i,0].set_ylabel("IC #{}".format(i+1), fontsize=14)
 			if i==ncomp:
 				axs[-1,0].set_xlabel(labels[j], fontsize=14)
-	plt.show()
+
+	for ax_row in axs:
+		for ax in ax_row:
+			for axis in ['top', 'bottom', 'left', 'right']:
+				ax.spines[axis].set_linewidth(1.0)
+				ax.tick_params(axis='both', which='major', labelsize=12)
+
+	if foname is not None:
+		plt.savefig(foname)
+		plt.close()
+	else:
+		plt.show()
 
 
 if __name__=="__main__":
