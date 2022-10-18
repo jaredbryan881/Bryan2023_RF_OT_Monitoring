@@ -1,6 +1,6 @@
 import numpy as np
 
-def create_grid(rf_arr, t_axis, tlim, npts):
+def create_grid(rf_arr, t_axis, npts):
 	"""
 	Create the time-amplitude grid for one component of the receiver function. 
 
@@ -22,14 +22,11 @@ def create_grid(rf_arr, t_axis, tlim, npts):
 	:return Y: list
 		meshgrid for amplitude
 	"""
-	# get points on the t-axis within the bounds set by tlim
-	t_inds = (t_axis>=tlim[0]) & (t_axis<tlim[1])
-	t_pts = t_axis[t_inds]
 	# get points on the y-axis
-	y_pts = np.linspace(np.min(rf_arr[:,t_inds]), np.max(rf_arr[:,t_inds]), npts)
+	y_pts = np.linspace(np.min(rf_arr), np.max(rf_arr), npts)
 
 	# create the grid
-	T,Y=np.meshgrid(t_pts, y_pts)
+	T,Y=np.meshgrid(t_axis, y_pts)
 
 	return T, Y
 
