@@ -154,24 +154,22 @@ def time_full_ensemble_vs_distribution():
 	plt.show()
 
 	# How does error change with n_rfs and n_amp
-	fig,ax=plt.subplots(1,1,figsize=(10,10))
+	fig,axs=plt.subplots(2,1,figsize=(10,10), gridspec_kw={'height_ratios': [2,1]})
 	for a in range(len(n_amps)):
-		ax.scatter(n_rfs_arr, np.abs(d_dist[:,a]-d_concat)*100/d_concat, color=cm.inferno(a/len(n_amps)))
-	ax.plot(n_rfs_arr, n_rfs_arr-n_rfs_arr, c='crimson', lw=2)
-	ax.set_ylabel("Error [%]", fontsize=12)
-	ax.set_xlabel("Number of RFs", fontsize=12)
-	ax.set_xscale('log')
-	plt.show()
+		axs[0].scatter(n_rfs_arr, np.abs(d_dist[:,a]-d_concat)*100/d_concat, color=cm.inferno(a/len(n_amps)))
+	axs[0].plot(n_rfs_arr, n_rfs_arr-n_rfs_arr, c='crimson', lw=2)
+	axs[0].set_ylabel("Error [%]", fontsize=14)
+	axs[0].set_xlabel("Number of RFs", fontsize=14)
+	axs[0].set_xscale('log')
 
 	# Average the error across different n_rfs
 	d_dist_nrfsavg=np.zeros(len(n_amps))
-	fig,ax=plt.subplots(1,1,figsize=(10,10))
 	for a in range(len(n_amps)):
 		d_dist_nrfsavg[a] = np.mean((d_dist[:,a]-d_concat)/d_concat)
-	ax.scatter(n_amps, d_dist_nrfsavg*100, c='k')
-	ax.set_ylabel("Error [%]", fontsize=12)
-	ax.set_xlabel("Number of Amplitudes", fontsize=12)
-	ax.set_xscale('log')
+	axs[1].scatter(n_amps, d_dist_nrfsavg*100, color=[cm.inferno(i/len(n_amps)) for i in range(len(n_amps))])
+	axs[1].set_ylabel("Error [%]", fontsize=14)
+	axs[1].set_xlabel("Number of Amplitudes", fontsize=14)
+	axs[1].set_xscale('log')
 	plt.show()
 
 if __name__=="__main__":

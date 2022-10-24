@@ -15,7 +15,7 @@ from distance_matrix import distance_matrix_1d, distance_matrix_2d
 
 def main():
 	plot_single_waveform_schematic()
-	#plot_distribution_schematic()
+	plot_distribution_schematic()
 
 def plot_single_waveform_schematic():
 	# ----- Define parameters -----
@@ -119,6 +119,8 @@ def plot_single_waveform_schematic():
 	axs[1].annotate("b", (-0.91,6.9),    fontsize=16, weight='bold')
 	axs[2].annotate("c", (-0.91,6.9),    fontsize=16, weight='bold')
 	axs[3].annotate("d", (-0.91,6.9),    fontsize=16, weight='bold')
+
+	plt.tight_layout()
 
 	plt.show()
 
