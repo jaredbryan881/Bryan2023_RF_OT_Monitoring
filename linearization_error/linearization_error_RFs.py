@@ -271,8 +271,13 @@ def compare_transport_maps():
 	axs[1].annotate("b", (-0.95, 6), fontsize=12, weight='bold')
 	axs[2].annotate("c", (-0.95, 6.5), fontsize=12, weight='bold')
 
+	axs[0].annotate(r"$\mu_0 \rightarrow \mu_1$, $\mu_0 \rightarrow \mu_2$", (3.8, 6.5), fontsize=12)
+	axs[1].annotate(r"$\mu_1 \rightarrow \mu_2$", (4.2, 6), fontsize=12)
+	axs[2].annotate(r"$\phi(\mu_2) - \phi(\mu_1)$", (3.9, 6), fontsize=12)
+
 	axs[2].set_xlabel("Time [s]", fontsize=14)
 	axs[2].set_xlim(tlim[0], tlim[1])
+	plt.tight_layout()
 	plt.show()
 
 if __name__=="__main__":
