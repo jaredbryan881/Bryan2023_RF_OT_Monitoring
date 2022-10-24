@@ -74,7 +74,7 @@ def plot_pot_vs_prune():
 	ot_map*=npts_win
 
 	# iterate over times in first RF dist
-	fig,axs=plt.subplots(3,1,figsize=(10,5))
+	fig,axs=plt.subplots(3,1,figsize=(10,5),sharex=True)
 	axs[0].scatter(t_axis[t_inds], t_weight*rf_ref_ts[t_inds], c='steelblue', s=5)
 	axs[0].scatter(t_axis[t_inds], t_weight*rf_pert_ts[t_inds], c='crimson', s=5)
 	axs[0].set_xlim(tlim[0], tlim[1])
@@ -125,6 +125,10 @@ def plot_pot_vs_prune():
 	axs[0].annotate("a", (-0.97,6.5), fontsize=12, weight='bold')
 	axs[1].annotate("b", (-0.97,6.5), fontsize=12, weight='bold')
 	axs[2].annotate("c", (-0.97,6.5), fontsize=12, weight='bold')
+
+	axs[0].annotate("Full OT", (4,6.5), fontsize=12, weight='bold')
+	axs[1].annotate("Pruned Full OT", (3.5,6.5), fontsize=12, weight='bold')
+	axs[2].annotate("Partial OT", (3.8,6.5), fontsize=12, weight='bold')
 
 	plt.tight_layout()
 	plt.show()
