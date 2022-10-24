@@ -41,8 +41,6 @@ def plot_pot_vs_prune():
 	# Parameters for optimal transport
 	m=0.95
 
-	save_figs=False
-
 	# ----- Calculate reference RF -----
 	# Load model and calculate RF
 	ref_model = ut.read_model(modfile)
@@ -66,8 +64,6 @@ def plot_pot_vs_prune():
 	noise = np.random.normal(loc=0.0, scale=sigma, size=npts)
 	rf_pert_ts = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None, noise=noise).data
 
-	fig,axs=plt.subplots(3,1,figsize=(10,10))
-
 	rf_ref=np.array([t_axis[t_inds], t_weight*rf_ref_ts[t_inds]]).T
 	rf_pert=np.array([t_axis[t_inds], t_weight*rf_pert_ts[t_inds]]).T
 
@@ -78,6 +74,7 @@ def plot_pot_vs_prune():
 	ot_map*=npts_win
 
 	# iterate over times in first RF dist
+	fig,axs=plt.subplots(3,1,figsize=(10,5))
 	axs[0].scatter(t_axis[t_inds], t_weight*rf_ref_ts[t_inds], c='steelblue', s=5)
 	axs[0].scatter(t_axis[t_inds], t_weight*rf_pert_ts[t_inds], c='crimson', s=5)
 	axs[0].set_xlim(tlim[0], tlim[1])
@@ -124,6 +121,12 @@ def plot_pot_vs_prune():
 			axs[2].plot([rf_ref[:,0][i], rf_ref[:,0][i]+vector_x], [rf_ref[:,1][i], rf_ref[:,1][i]+vector_y], c='k')
 
 	axs[2].set_xlabel("Time [s]", fontsize=12)
+
+	axs[0].annotate("a", (-0.97,6.5), fontsize=12, weight='bold')
+	axs[1].annotate("b", (-0.97,6.5), fontsize=12, weight='bold')
+	axs[2].annotate("c", (-0.97,6.5), fontsize=12, weight='bold')
+
+	plt.tight_layout()
 	plt.show()
 
 if __name__=="__main__":
