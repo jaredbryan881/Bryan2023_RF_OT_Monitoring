@@ -7,7 +7,7 @@ from telewavesim import utils as ut
 
 import sys
 sys.path.append("../")
-from distribution_utils import distance_matrix_1d
+from distance_matrix import distance_matrix_1d
 from sim_synth import simulate_RF
 
 import ot
@@ -17,11 +17,11 @@ def main():
 	# Parameters for raw synthetic RFs
 	modfile='../velocity_models/model_10lohs.txt'
 	wvtype='P' # incident wave type
-	npts=8193 # Number of samples
-	dt=0.05 # time discretization
+	npts=8193*5 # Number of samples
+	dt=0.01 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
-	slow=0.05 # slowness limits
-	pert=-0.02
+	slow=0.06 # slowness limits
+	pert=-0.05
 
 	# Parameters for processed synthetic RFs
 	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
@@ -32,7 +32,7 @@ def main():
 	save_figs=False
 
 	# Parameters for optimal transport
-	m=0.95
+	m=0.9
 
 	np.random.seed(0)
 
@@ -52,7 +52,7 @@ def main():
 	# Turn 1D reference RF into a 2D point cloud via a time-amplitude scaling
 	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
 	delta_a = np.max(rf_ref_ts)-np.min(rf_ref_ts)
-	t_weight = delta_t/delta_a
+	t_weight = (delta_t/delta_a)
 	rf_ref = np.array([t_axis[t_inds], rf_ref_ts[t_inds]]).T
 
 	# ----- Calculate ensemble of RFs -----
@@ -72,10 +72,10 @@ def main():
 
 	axs2.plot(vp, depth, drawstyle='steps-post', c='steelblue', lw=2)
 	axs2.plot(vs, depth, drawstyle='steps-post', c='k', lw=2)
-	for i in range(n_layers-1):
+	for i in range(0,n_layers-1,2):
 		# Get telewavesim model with given perturbation
 		pert_model = copy.deepcopy(ref_model)
-		pert_model.vs[i]*=(1+pert)
+		pert_model.vs[i:i+2]*=(1+pert)
 		#pert_model.vp[i]*=(1+pert)
 		pert_model.update_tensor()
 
@@ -94,8 +94,9 @@ def main():
 		M=ot.dist(rf_cur, rf_ref) # GSOT distance matrix
 		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
-		p=ot.partial.partial_wasserstein(a,b,M_tlp,m=m)
+		p=ot.partial.partial_wasserstein(a,b,M_tlp,m=m,nb_dummies=10)
 		valid_inds = np.sum(p,axis=0)!=0
+		valid_inds=[True for i in range(npts_win)]
 
 		# ----- Calculate the OT dist -----
 		d_t=np.sum(p*M_t,axis=0)
@@ -105,15 +106,18 @@ def main():
 		# plot the distance
 		c=cm.inferno((i+1)/n_layers)
 		axs1[0].plot(t_axis[t_inds], rfs_pert[i, t_inds], c=c, lw=2)
-		axs1[1].plot(t_axis[t_inds][valid_inds], d_t[valid_inds], c=c, lw=2)
-		axs1[2].plot(t_axis[t_inds][valid_inds], d_a[valid_inds], c=c, lw=2)
-		axs1[3].plot(t_axis[t_inds][valid_inds], d[valid_inds], c=c, lw=2)
+		axs1[1].plot(t_axis[t_inds][valid_inds], d_t[valid_inds] - i/1e4, c=c, lw=2)
+		axs1[2].plot(t_axis[t_inds][valid_inds], d_a[valid_inds] - i/1e7, c=c, lw=2)
+		axs1[3].plot(t_axis[t_inds][valid_inds], d[valid_inds] - i/1e4, c=c, lw=2)
 
 		dists_im[0,i]=d_t
 		dists_im[1,i]=d_a
 		dists_im[2,i]=d
 
+		# fill in Vs perturbation
 		axs2.axvspan(pert_model.vs[i], ref_model.vs[i], ymin=1-(4*i)/depth[-1], ymax=1-(4*(i+1))/depth[-1], facecolor=c, alpha=0.75)
+		axs2.axvspan(pert_model.vs[i+1], ref_model.vs[i+1], ymin=1-(4*(i+1))/depth[-1], ymax=1-(4*(i+2))/depth[-1], facecolor=c, alpha=0.75)
+		# fill in Vp perturbation
 		axs2.axvspan(pert_model.vp[i], ref_model.vp[i], ymin=1-(4*i)/depth[-1], ymax=1-(4*(i+1))/depth[-1], facecolor=c, alpha=0.75)
 
 	axs1[0].plot(t_axis[t_inds], rf_ref_ts[t_inds], lw=2, c='k')
