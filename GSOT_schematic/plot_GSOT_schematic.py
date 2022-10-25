@@ -67,7 +67,7 @@ def plot_single_waveform_schematic():
 	noise = np.random.normal(loc=0.0, scale=sigma, size=npts)
 	rf_pert_ts = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None, noise=noise).data
 
-	fig,axs=plt.subplots(4,1,figsize=(10,10))
+	fig,axs=plt.subplots(4,1,figsize=(10,8), sharex=True)
 	axs[0].plot(t_axis[t_inds], rf_ref_ts[t_inds], c='steelblue', lw=2)
 	axs[0].plot(t_axis[t_inds], rf_pert_ts[t_inds], c='crimson', lw=2)
 	axs[0].set_xlim(tlim[0], tlim[1])
@@ -132,7 +132,7 @@ def plot_distribution_schematic():
 	npts=8193 # Number of samples
 	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
-	plim=[0.04,0.06] # slowness
+	plim=[0.04,0.08] # slowness
 
 	np.random.seed(0)
 
@@ -147,7 +147,7 @@ def plot_distribution_schematic():
 	noise_level=0.5 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
-	m=0.95
+	m=0.9
 
 	save_figs=False
 
@@ -155,7 +155,7 @@ def plot_distribution_schematic():
 	# Load model and calculate RF
 	ref_model = ut.read_model(modfile)
 
-	pert_s=-0.05
+	pert_s=-0.02
 	pert_model = copy.deepcopy(ref_model)
 	pert_model.vs[0]*=(1+pert_s)
 	pert_model.update_tensor()
@@ -193,7 +193,7 @@ def plot_distribution_schematic():
 	rfs_ref_dist = rf_hist(rfs_ref, G)
 	rfs_pert_dist = rf_hist(rfs_pert, G)
 	
-	fig,axs=plt.subplots(4,1,figsize=(10,10))
+	fig,axs=plt.subplots(4,1,figsize=(10,8),sharex=True)
 	for i in range(n_rfs):
 		axs[0].plot(t_axis[t_inds], rfs_ref[i], c='k', lw=1, alpha=0.1, rasterized=True)
 	axs[0].set_xlim(tlim[0], tlim[1])
@@ -219,6 +219,7 @@ def plot_distribution_schematic():
 	ref_im_mass = rfs_ref_dist.T[nz_inds]
 	ref_coords = np.array([ref_im_times, ref_im_amps]).T
 
+	print("Calculating OT plan")
 	# define distance matrices for the full distribution
 	M_t = distance_matrix_1d(pert_im_times[...,np.newaxis], ref_im_times[...,np.newaxis])
 	M_a = distance_matrix_1d(pert_im_amps[...,np.newaxis], ref_im_amps[...,np.newaxis])
@@ -228,15 +229,23 @@ def plot_distribution_schematic():
 	axs[3].imshow(masked_array1, origin='lower', cmap=cmap, interpolation=None, extent=[tlim[0], tlim[1], t_weight*np.min(rfs_ref), t_weight*np.max(rfs_ref)], rasterized=True)
 	axs[3].set_aspect("auto")
 
-	ot_map=np.matmul((len(nz_inds[0])*ot_plan).T, pert_coords)
-	ot_map[:,0]/=ref_im_mass
-	ot_map[:,1]/=ref_im_mass
+	print("Calculating net vectors")
+	npts_dist=np.sum(nz_inds)
+	net_vectors=np.zeros((ot_plan.shape[1], 2))
+	for i in range(ot_plan.shape[0]):
+		for j in range(ot_plan.shape[1]):
+			if ot_plan[i,j]==0:
+				continue
+			delta_t=pert_coords[i,0]-ref_coords[j,0]
+			delta_a=pert_coords[i,1]-ref_coords[j,1]
+			net_vectors[j,0]+=npts_dist*ot_plan[i,j]*delta_t
+			net_vectors[j,1]+=npts_dist*ot_plan[i,j]*delta_a
 
-	ot_map_sparse = np.zeros(ot_map.shape)
-	ot_map_sparse[::10,:]=ot_map[::10,:]
+	net_vectors_sparse=np.zeros(net_vectors.shape)
+	net_vectors_sparse[::1,:]=net_vectors[::1,:]
 
-	quiver_params = {"scale": 3e8, "color": 'w', "ec": 'k', "width": 0.002, "headwidth": 3, "linewidth": 0.1, "minlength": 0.01, "pivot": "tail"}
-	axs[3].quiver(G[0][nz_inds], t_weight*G[1][nz_inds], t_weight*ot_map_sparse[:,0], t_weight*ot_map_sparse[:,1], **quiver_params, rasterized=True)
+	quiver_params = {"scale": 5e2, "color": 'w', "ec": 'k', "width": 0.002, "headwidth": 3, "linewidth": 0.1, "minlength": 0.01, "pivot": "tail"}
+	axs[3].quiver(G[0][nz_inds], t_weight*G[1][nz_inds], net_vectors_sparse[:,0], t_weight*net_vectors_sparse[:,1], **quiver_params, rasterized=True)
 	axs[3].set_xlabel("Time [s]", fontsize=16)
 
 
