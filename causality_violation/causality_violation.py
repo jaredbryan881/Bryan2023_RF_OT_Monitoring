@@ -19,6 +19,7 @@ def main():
 	# Compare to a causality-preserving warping function
 
 	# define parameters
+	modfile='../velocity_models/model_causality_violation.txt'
 	wvtype = 'P' # incident wave type
 	npts = 8193  # Number of samples
 	dt = 0.01
@@ -36,29 +37,30 @@ def main():
 	save_fig=True
 
 	# contrive a model whose perturbation induces a causality violation in the transport map
-	ref_model = ut.Model(thickn = [10.0, 10.0, 0.],
-						 rho    = [2800., 2800., 3200.],
-						 vp     = [3.0, 5.0, 8.0],
-						 vs     = [2.0, 3.0, 6.0])
+	ref_model = ut.read_model(modfile)
 
+	# simulate the perturbed RFs
 	pert_model = copy.deepcopy(ref_model)
 	pert_model.vs[1]*=(1-pert)
 	pert_model.update_tensor()
-	rf_ref = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
+	rf_ref_ts = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
 
 	pert_model = copy.deepcopy(ref_model)
 	pert_model.vs[1]*=(1+pert)
 	pert_model.update_tensor()
-	rf_pert = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
+	rf_pert_ts = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
 
 	# set time-amplitude scaling
 	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
-	delta_a = np.max(rf_ref)-np.min(rf_ref)
+	delta_a = np.max(rf_ref_ts)-np.min(rf_ref_ts)
 	t_weight = (delta_t/delta_a)
-	# calculate distance matrices
-	M_t = distance_matrix_1d(t_axis[t_inds,np.newaxis], t_axis[t_inds,np.newaxis])
-	M_a = distance_matrix_1d(rf_ref[t_inds,np.newaxis], rf_pert[t_inds,np.newaxis])
-	M_tlp = M_t + t_weight*M_a
+
+	# lift to the graph of the signals
+	rf_ref = np.array([t_axis[t_inds], t_weight*rf_ref_ts[t_inds]]).T
+	rf_pert = np.array([t_axis[t_inds], t_weight*rf_pert_ts[t_inds]]).T
+
+	# calculate distance matrix
+	M_tlp = distance_matrix_1d(rf_ref, rf_pert)
 
 	# solve OT problem
 	ot_map = partial_ot_dist_tlp(M_tlp, m=mass, nb_dummies=20)
@@ -67,30 +69,29 @@ def main():
 	# show that the warping function enforces causality
 	l2_norm = lambda x, y: np.linalg.norm(x-y,ord=2)
 
-	d,cost_matrix,acc_cost_matrix,path = dtw(rf_ref[t_inds,np.newaxis], rf_pert[t_inds,np.newaxis], dist=l2_norm)
-
-
+	d,cost_matrix,acc_cost_matrix,path = dtw(rf_ref_ts[t_inds,np.newaxis], rf_pert_ts[t_inds,np.newaxis], dist=l2_norm)
 
 	# Initialize plot
 	fig,axs=plt.subplots(2,1, sharex=True, sharey=True, figsize=(10,6))
 	# plot RFs
-	axs[0].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
-	axs[0].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
+	axs[0].scatter(t_axis[t_inds], rf_ref_ts[t_inds], c='crimson', ec=None, s=20)
+	axs[0].scatter(t_axis[t_inds], rf_pert_ts[t_inds], c='steelblue', ec=None, s=20)
 
 	# plot connections in the transport map
 	for i in range(npts_win):
-		if np.sum(ot_map[i]==1)!=0:
+		cur_inds=npts_win*ot_map[i]==1
+		if np.sum(cur_inds)!=0:
 			# coords of the source point
-			vector_x = t_axis[t_inds][ot_map[i]==1]-t_axis[t_inds][i]
-			vector_y = rf_pert[t_inds][ot_map[i]==1]-rf_ref[t_inds][i]
+			vector_x = t_axis[t_inds][cur_inds]-t_axis[t_inds][i]
+			vector_y = rf_pert_ts[t_inds][cur_inds]-rf_ref_ts[t_inds][i]
 
 			# plot connection
-			axs[0].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], lw=1, c='k')
+			axs[0].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref_ts[t_inds][i], rf_ref_ts[t_inds][i]+vector_y], lw=1, c='k')
 
-	axs[1].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
-	axs[1].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
+	axs[1].scatter(t_axis[t_inds], rf_ref_ts[t_inds], c='crimson', ec=None, s=20)
+	axs[1].scatter(t_axis[t_inds], rf_pert_ts[t_inds], c='steelblue', ec=None, s=20)
 	for (p1,p2) in zip(path[0], path[1]):
-		axs[1].plot([t_axis[t_inds][p1], t_axis[t_inds][p2]], [rf_ref[t_inds][p1], rf_pert[t_inds][p2]], c='k', lw=1)
+		axs[1].plot([t_axis[t_inds][p1], t_axis[t_inds][p2]], [rf_ref_ts[t_inds][p1], rf_pert_ts[t_inds][p2]], c='k', lw=1)
 
 	# make the plot nicer
 	axs[0].set_yticks([-0.01,0.00,0.01,0.02,0.03])
