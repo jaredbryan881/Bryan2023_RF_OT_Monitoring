@@ -21,7 +21,7 @@ def main():
 	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
 	slow=0.05 # slowness limits
-	dvlim=[0.00,-0.02] # Vs perturbation limits
+	dvlim=[-0.00,0.02] # Vs perturbation limits
 
 	# Parameters for processed synthetic RFs
 	t_axis = np.linspace(-(npts//2)*dt, (npts//2)*dt, npts) # time axis
@@ -29,15 +29,15 @@ def main():
 	t_inds = (t_axis >= tlim[0]) & (t_axis < tlim[-1]) # corresponding indices
 	npts_win = np.sum(t_inds) # number of points in the time window
 	flim = 1.0 # bandpass frequencies
-	save_figs=True
+	save_figs=False
 
 	# Parameters for optimal transport
-	m=0.95
+	m=0.97
 
 	sign=False
 
 	# horizontal slowness (ray parameter) in s/km
-	perts = np.linspace(dvlim[0], dvlim[1], 11)
+	perts = np.linspace(dvlim[0], dvlim[1], 6)
 
 	# ----- Calculate reference RF -----
 	# Load model and calculate RF
@@ -47,8 +47,8 @@ def main():
 	# Turn 1D reference RF into a 2D point cloud via a time-amplitude scaling
 	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
 	delta_a = np.max(rf_ref_ts)-np.min(rf_ref_ts)
-	t_weight = delta_t/delta_a
-	rf_ref = np.array([t_axis[t_inds], rf_ref_ts[t_inds]]).T
+	t_weight = (delta_t/delta_a)
+	rf_ref = np.array([t_axis[t_inds], t_weight*rf_ref_ts[t_inds]]).T
 
 	# ----- Calculate ensemble of RFs -----
 	rfs_pert_vp = np.empty((len(perts), npts))
@@ -73,12 +73,12 @@ def main():
 		rfs_pert_vs[i] = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
 
 		# Turn 1D RF into 2D point cloud
-		rf_cur = np.array([t_axis[t_inds], rfs_pert_vs[i,t_inds]]).T
+		rf_cur = np.array([t_axis[t_inds], t_weight*rfs_pert_vs[i,t_inds]]).T
 
 		# ----- Calculate the distance matrix -----
 		M_t = distance_matrix_1d(t_axis[t_inds,np.newaxis], t_axis[t_inds,np.newaxis])
 		M_a = distance_matrix_1d(rf_cur[:,1,np.newaxis], rf_ref[:,1,np.newaxis])
-		M_tlp = M_t + t_weight*M_a
+		M_tlp=distance_matrix_1d(rf_cur, rf_ref)
 
 		# ----- Calculate the OT plan -----
 		M=ot.dist(rf_cur, rf_ref) # GSOT distance matrix
@@ -88,35 +88,49 @@ def main():
 		valid_inds = np.sum(p,axis=0)!=0
 
 		# ----- Calculate the OT dist -----
+		# Sign the OT distance depending on the direction of transport
 		if sign:
 			dt_sign=np.sign(t_axis[t_inds,np.newaxis]-t_axis[np.newaxis,t_inds])
 			da_sign=np.sign(rf_cur[:,1,np.newaxis]-rf_ref[np.newaxis,:,1])
 			M_t*=dt_sign
 			M_a*=da_sign
-		d_t=np.sum(p*M_t,axis=0)
-		d_a=np.sum(p*M_a,axis=0)
-		d=np.sum(p*M_tlp,axis=0)
+		# Integrate over one dimension to leave distance time series
+		d_t = np.sum(p*M_t,axis=0)
+		d_a = np.sum(p*M_a,axis=0)
+		d   = np.sum(p*M_tlp,axis=0)
 
 		# plot the distance
 		if pert==0:
+			# reference RF
 			c='k'
 		else:
+			# perturbed RFs
 			if sign:
 				c=cm.coolwarm(i/len(perts))
 			else:
 				c=cm.inferno(i/len(perts))
 
+		# plot receiver functions
 		axs[0].plot(t_axis[t_inds], rfs_pert_vp[i,t_inds], c=c, lw=2)
 		axs[1].plot(t_axis[t_inds], rfs_pert_vs[i, t_inds], c=c, lw=2)
+		# plot OT distances
 		axs[2].plot(t_axis[t_inds][valid_inds], d_t[valid_inds], c=c, lw=2)
 		axs[3].plot(t_axis[t_inds][valid_inds], d_a[valid_inds], c=c, lw=2)
 		axs[4].plot(t_axis[t_inds][valid_inds], d[valid_inds], c=c, lw=2)
 
+	# format axes
 	axs[0].set_xlim(tlim[0],tlim[-1])
 	axs[4].set_xlabel("Time [s]", fontsize=12)
 	axs[2].set_ylabel(r"$\gamma c^t$", fontsize=12)
 	axs[3].set_ylabel(r"$\gamma c^a$", fontsize=12)
-	axs[4].set_ylabel(r"$\gamma (c^t+\lambda c^a)$", fontsize=12)
+	axs[4].set_ylabel(r"$\gamma (c^t+\lambda^2 c^a)$", fontsize=12)
+
+	# make subplot annotations
+	axs[0].annotate("a", (-0.91,0.025),   fontsize=16, weight='bold')
+	axs[1].annotate("b", (-0.91,0.025),   fontsize=16, weight='bold')
+	axs[2].annotate("c", (-0.91,1.15e-3), fontsize=16, weight='bold')
+	axs[3].annotate("d", (-0.91,1.2e-3),  fontsize=16, weight='bold')
+	axs[4].annotate("e", (-0.91,1.22e-3), fontsize=16, weight='bold')
 
 	# get the axes in scientific noation
 	axs[0].ticklabel_format(axis="y", style="sci", scilimits=(0,0))
