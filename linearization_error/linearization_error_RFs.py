@@ -16,8 +16,8 @@ from sim_synth import simulate_RF
 import ot
 
 def main():
-	#linearization_error_RFs()
-	compare_transport_maps()
+	linearization_error_RFs()
+	#compare_transport_maps()
 
 def linearization_error_RFs():
 	# ----- Define parameters -----
@@ -91,7 +91,7 @@ def linearization_error_RFs():
 		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
 		p=ot.partial.partial_wasserstein(a,b,C,m=m)
 		
-		Vi=(np.matmul((npts_win*p).T,rf_cur)-rf_ref)#/np.sqrt(npts_win)
+		Vi=(np.matmul((npts_win*p).T,rf_cur)-rf_ref)
 
 		# Find indices that mapped to the dummy points and set to NaN
 		# We'll treat these as missing observations during the LOT section
@@ -103,12 +103,23 @@ def linearization_error_RFs():
 
 	# Calculate the distance matrix
 	ind=0
-	d_lot=np.zeros(int(n_rfs*(n_rfs-1)/2))
-	d_ot=np.zeros(int(n_rfs*(n_rfs-1)/2))
+	d_lot = np.zeros((n_rfs, n_rfs))
+	d_ot = np.zeros((n_rfs, n_rfs))
+	d_trineq = np.zeros((n_rfs, n_rfs))
+	d_comp = np.zeros((n_rfs, n_rfs))
+	d_trineq=np.zeros((n_rfs, n_rfs))
 
 	for i in range(n_rfs):
 		print(i)
 		rf1=np.array([t_axis[t_inds], t_weight*rfs_pert[i,t_inds]]).T
+
+		# calculate the transport map from rf1 to rf_ref
+		C=ot.dist(rf1, rf_ref, metric='euclidean') # GSOT distance matrix
+		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
+		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
+		p=ot.partial.partial_wasserstein(a,b,C,m=m)
+		f10 = np.matmul((npts_win*p).T, rf1)/npts_win
+
 		for j in range(i+1,n_rfs):
 			rf2=np.array([t_axis[t_inds], t_weight*rfs_pert[j,t_inds]]).T
 
@@ -117,31 +128,58 @@ def linearization_error_RFs():
 			a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 			b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
 			p=ot.partial.partial_wasserstein(a,b,C,m=m)
-			d_ot[ind]=np.sum(p*C)
+			d_ot[i,j]=np.sum(p*C)
+			d_ot[j,i]=d_ot[i,j]
 
 			# calculate the OT distance in the embedding space
 			V_diff=Vs[j]-Vs[i]
-			d_lot[ind]=np.sqrt(np.nansum((V_diff/np.sqrt(npts_win))**2))
+			d_lot[i,j]=np.sqrt(np.nansum((V_diff/np.sqrt(npts_win))**2))
+			d_lot[j,i]=d_lot[i,j]
+
+			# calculate the maximum distance which takes into account transport map distortion
+			C=ot.dist(rf_ref, rf2, metric='euclidean') # GSOT distance matrix
+			p=ot.partial.partial_wasserstein(a,b,C,m=m)
+			f02 = np.matmul((npts_win*p).T, rf_ref)/npts_win
+
+			f12 = np.matmul((npts_win*p).T, rf1)/npts_win
+			d_comp[i,j] = d_ot[i,j] + np.sqrt(np.nansum(((f12-(f10*f02)))**2))
+			d_comp[j,i] = d_comp[i,j]
 
 			ind+=1
 
-	fig,axs=plt.subplots(2,1)
-	dist_dens=np.vstack([d_ot,d_lot])
+	fig,axs=plt.subplots(2,1,sharex=True)
+	# raw distances
+	# 1:1
+	axs[0].plot(d_ot, d_ot, c='k', lw=2)
+	# LOT distances
+	dist_dens=np.vstack([d_ot.flatten(),d_lot.flatten()])
 	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
-	axs[0].plot(d_ot, d_ot, c='crimson', linestyle='--', lw=2)
-	axs[0].scatter(d_ot, d_lot, c=cm.inferno(dist_dens_c/dist_dens_c.max()))
-	axs[0].set_xlabel(r"$d_{OT}$", fontsize=12)
-	axs[0].set_ylabel(r"$d_{LOT}$", fontsize=12)
+	axs[0].scatter(d_ot.flatten(), d_lot.flatten(), c=cm.Blues(dist_dens_c/dist_dens_c.max()))
+	# transport map distortion
+	dist_dens=np.vstack([d_ot.flatten(),d_comp.flatten()])
+	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
+	axs[0].scatter(d_ot.flatten(), d_comp.flatten(), c=cm.Reds(dist_dens_c/dist_dens_c.max()))
 
-	error=(d_lot-d_ot)/d_ot
-	error_dens=np.vstack([d_ot, error])
+	# error
+	# 1:1
+	axs[1].plot(d_ot, d_ot-d_ot, c='k', lw=2)
+	# LOT distances
+	error=(d_lot-d_ot)
+	error_dens=np.vstack([d_ot.flatten(), error.flatten()])
 	error_dens_c = gaussian_kde(error_dens)(error_dens)
-	axs[1].plot(d_ot, d_ot-d_ot, c='crimson', linestyle='--', lw=2)
-	axs[1].scatter(d_ot, error*100, c=cm.inferno(error_dens_c/error_dens_c.max()))
+	axs[1].scatter(d_ot.flatten(), (error/d_ot).flatten()*100, c=cm.Blues(error_dens_c/error_dens_c.max()))
+	# transport map distortion
+	error=(d_comp-d_ot)
+	error_dens=np.vstack([d_ot.flatten(), error.flatten()])
+	error_dens_c = gaussian_kde(error_dens)(error_dens)
+	axs[1].scatter(d_ot.flatten(), (error/d_ot).flatten()*100, c=cm.Reds(error_dens_c/error_dens_c.max()))
+	
+	# format axes
+	axs[0].set_ylabel(r"$d_{LOT}$", fontsize=12)
 	axs[1].set_xlabel(r"$d_{OT}$", fontsize=12)
 	axs[1].set_ylabel("error [%]", fontsize=12)
+	plt.tight_layout()
 	plt.show()
-
 
 def compare_transport_maps():
 	# ----- Define parameters -----
