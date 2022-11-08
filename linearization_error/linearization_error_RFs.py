@@ -97,12 +97,10 @@ def linearization_error_RFs():
 		# We'll treat these as missing observations during the LOT section
 		pruned_inds=np.sum(p,axis=0)==0
 		Vi[pruned_inds,:]=np.nan
-
 		Vs.append(Vi)
 	Vs=np.asarray(Vs)
 
 	# Calculate the distance matrix
-	ind=0
 	d_lot = np.zeros((n_rfs, n_rfs))
 	d_ot = np.zeros((n_rfs, n_rfs))
 	d_trineq = np.zeros((n_rfs, n_rfs))
@@ -144,8 +142,6 @@ def linearization_error_RFs():
 			f12 = np.matmul((npts_win*p).T, rf1)/npts_win
 			d_comp[i,j] = d_ot[i,j] + np.sqrt(np.nansum(((f12-(f10*f02)))**2))
 			d_comp[j,i] = d_comp[i,j]
-
-			ind+=1
 
 	fig,axs=plt.subplots(2,1,sharex=True)
 	# raw distances
