@@ -39,7 +39,7 @@ def linearization_error_RFs():
 	flim = 1.0 # bandpass frequencies
 
 	# Parameters for RF ensemble & noise
-	n_rfs = 100 # number of RFs in the synthetic distributions
+	n_rfs = 50 # number of RFs in the synthetic distributions
 	noise_level=0.0 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
@@ -103,44 +103,50 @@ def linearization_error_RFs():
 	# Calculate the distance matrix
 	d_lot = np.zeros((n_rfs, n_rfs))
 	d_ot = np.zeros((n_rfs, n_rfs))
-	d_trineq = np.zeros((n_rfs, n_rfs))
 	d_comp = np.zeros((n_rfs, n_rfs))
-	d_trineq=np.zeros((n_rfs, n_rfs))
 
 	for i in range(n_rfs):
 		print(i)
 		rf1=np.array([t_axis[t_inds], t_weight*rfs_pert[i,t_inds]]).T
 
 		# calculate the transport map from rf1 to rf_ref
-		C=ot.dist(rf1, rf_ref, metric='euclidean') # GSOT distance matrix
+		C_10=ot.dist(rf1, rf_ref, metric='euclidean') # GSOT distance matrix
 		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
-		p=ot.partial.partial_wasserstein(a,b,C,m=m)
-		f10 = np.matmul((npts_win*p).T, rf1)/npts_win
+		p_10=ot.partial.partial_wasserstein(a,b,C_10,m=m) # transport plan
 
 		for j in range(i+1,n_rfs):
 			rf2=np.array([t_axis[t_inds], t_weight*rfs_pert[j,t_inds]]).T
 
-			# calculate the OT distance directly
-			C=ot.dist(rf1, rf2, metric='euclidean') # GSOT distance matrix
+			# calculate the OT plan from rf1 to rf2
+			C_12=ot.dist(rf1, rf2, metric='euclidean') # GSOT distance matrix
 			a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 			b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
-			p=ot.partial.partial_wasserstein(a,b,C,m=m)
-			d_ot[i,j]=np.sum(p*C)
+			p_12=ot.partial.partial_wasserstein(a,b,C_12,m=m) # transport plan
+			# calculate the associated distance
+			d_ot[i,j]=np.sum(p_12*C_12)
 			d_ot[j,i]=d_ot[i,j]
+			# approximate the Monge map
+			f_12=np.matmul((npts_win*p_12).T, rf1)
+			f_12[np.sum(p_12, axis=0)==0]=np.nan
 
 			# calculate the OT distance in the embedding space
 			V_diff=Vs[j]-Vs[i]
 			d_lot[i,j]=np.sqrt(np.nansum((V_diff/np.sqrt(npts_win))**2))
 			d_lot[j,i]=d_lot[i,j]
 
-			# calculate the maximum distance which takes into account transport map distortion
-			C=ot.dist(rf_ref, rf2, metric='euclidean') # GSOT distance matrix
-			p=ot.partial.partial_wasserstein(a,b,C,m=m)
-			f02 = np.matmul((npts_win*p).T, rf_ref)/npts_win
+			# calculate the transport map from rf_ref to rf2
+			C_02=ot.dist(rf_ref, rf2, metric='euclidean') # GSOT distance matrix
+			p_02=ot.partial.partial_wasserstein(a,b,C_02,m=m) # transport plan
+			# compose the two transport plans rf1->rf_ref->rf2
+			p_12_comp=np.matmul((npts_win*p_02).T, (npts_win*p_10).T)
+			f_12_comp=np.matmul(p_12_comp.T, rf1)
+			f_12_comp[np.sum(p_12_comp, axis=0)==0]=np.nan
 
-			f12 = np.matmul((npts_win*p).T, rf1)/npts_win
-			d_comp[i,j] = d_ot[i,j] + np.sqrt(np.nansum(((f12-(f10*f02)))**2))
+			dir_vs_comp=f_12-f_12_comp
+			dir_vs_comp_mag=np.sqrt(np.nansum((dir_vs_comp)**2)/npts_win)
+
+			d_comp[i,j] = d_ot[i,j] + dir_vs_comp_mag
 			d_comp[j,i] = d_comp[i,j]
 
 	fig,axs=plt.subplots(2,1,sharex=True)
@@ -156,6 +162,8 @@ def linearization_error_RFs():
 	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
 	axs[0].scatter(d_ot.flatten(), d_comp.flatten(), c=cm.Reds(dist_dens_c/dist_dens_c.max()))
 
+	axs[0].scatter(d_ot, d_comp-d_ot, c='k', alpha=0.1)
+
 	# error
 	# 1:1
 	axs[1].plot(d_ot, d_ot-d_ot, c='k', lw=2)
@@ -163,17 +171,17 @@ def linearization_error_RFs():
 	error=(d_lot-d_ot)
 	error_dens=np.vstack([d_ot.flatten(), error.flatten()])
 	error_dens_c = gaussian_kde(error_dens)(error_dens)
-	axs[1].scatter(d_ot.flatten(), (error/d_ot).flatten()*100, c=cm.Blues(error_dens_c/error_dens_c.max()))
+	axs[1].scatter(d_ot.flatten(), (error).flatten(), c=cm.Blues(error_dens_c/error_dens_c.max()))
 	# transport map distortion
 	error=(d_comp-d_ot)
 	error_dens=np.vstack([d_ot.flatten(), error.flatten()])
 	error_dens_c = gaussian_kde(error_dens)(error_dens)
-	axs[1].scatter(d_ot.flatten(), (error/d_ot).flatten()*100, c=cm.Reds(error_dens_c/error_dens_c.max()))
+	axs[1].scatter(d_ot.flatten(), (error).flatten(), c=cm.Reds(error_dens_c/error_dens_c.max()))
 	
 	# format axes
 	axs[0].set_ylabel(r"$d_{LOT}$", fontsize=12)
 	axs[1].set_xlabel(r"$d_{OT}$", fontsize=12)
-	axs[1].set_ylabel("error [%]", fontsize=12)
+	axs[1].set_ylabel("residual", fontsize=12)
 	plt.tight_layout()
 	plt.show()
 
