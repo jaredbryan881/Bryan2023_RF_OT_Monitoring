@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from matplotlib.offsetbox import AnchoredOffsetbox, TextArea, HPacker, VPacker
 import copy
 import time
 
@@ -39,7 +40,7 @@ def linearization_error_RFs():
 	flim = 1.0 # bandpass frequencies
 
 	# Parameters for RF ensemble & noise
-	n_rfs = 50 # number of RFs in the synthetic distributions
+	n_rfs = 100 # number of RFs in the synthetic distributions
 	noise_level=0.0 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
@@ -110,7 +111,8 @@ def linearization_error_RFs():
 		rf1=np.array([t_axis[t_inds], t_weight*rfs_pert[i,t_inds]]).T
 
 		# calculate the transport map from rf1 to rf_ref
-		C_10=ot.dist(rf1, rf_ref, metric='euclidean') # GSOT distance matrix
+		C_10=ot.dist(rf_ref, rf1, metric='euclidean') # GSOT distance matrix
+		#C_10=ot.dist(rf1, rf_ref, metric='euclidean')
 		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
 		p_10=ot.partial.partial_wasserstein(a,b,C_10,m=m) # transport plan
@@ -136,7 +138,8 @@ def linearization_error_RFs():
 			d_lot[j,i]=d_lot[i,j]
 
 			# calculate the transport map from rf_ref to rf2
-			C_02=ot.dist(rf_ref, rf2, metric='euclidean') # GSOT distance matrix
+			C_02=ot.dist(rf2, rf_ref, metric='euclidean') # GSOT distance matrix
+			#C_02=ot.dist(rf_ref, rf2, metric='euclidean')
 			p_02=ot.partial.partial_wasserstein(a,b,C_02,m=m) # transport plan
 			# compose the two transport plans rf1->rf_ref->rf2
 			p_12_comp=np.matmul((npts_win*p_02).T, (npts_win*p_10).T)
@@ -149,40 +152,57 @@ def linearization_error_RFs():
 			d_comp[i,j] = d_ot[i,j] + dir_vs_comp_mag
 			d_comp[j,i] = d_comp[i,j]
 
-	fig,axs=plt.subplots(2,1,sharex=True)
+	fig,axs=plt.subplots(2,1,sharex=True, figsize=(8,8))
 	# raw distances
 	# 1:1
 	axs[0].plot(d_ot, d_ot, c='k', lw=2)
-	# LOT distances
-	dist_dens=np.vstack([d_ot.flatten(),d_lot.flatten()])
-	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
-	axs[0].scatter(d_ot.flatten(), d_lot.flatten(), c=cm.Blues(dist_dens_c/dist_dens_c.max()))
+
 	# transport map distortion
 	dist_dens=np.vstack([d_ot.flatten(),d_comp.flatten()])
 	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
-	axs[0].scatter(d_ot.flatten(), d_comp.flatten(), c=cm.Reds(dist_dens_c/dist_dens_c.max()))
+	axs[0].scatter(d_ot.flatten(), d_comp.flatten(), c=cm.Reds(dist_dens_c/dist_dens_c.max()), rasterized=True)
 
-	axs[0].scatter(d_ot, d_comp-d_ot, c='k', alpha=0.1)
+	# LOT distances
+	dist_dens=np.vstack([d_ot.flatten(),d_lot.flatten()])
+	dist_dens_c = gaussian_kde(dist_dens)(dist_dens)
+	axs[0].scatter(d_ot.flatten(), d_lot.flatten(), c=cm.Blues(dist_dens_c/dist_dens_c.max()), rasterized=True)
 
 	# error
 	# 1:1
-	axs[1].plot(d_ot, d_ot-d_ot, c='k', lw=2)
+	axs[1].plot(d_ot, np.ones(len(d_ot)), c='k', lw=2)
 	# LOT distances
-	error=(d_lot-d_ot)
-	error_dens=np.vstack([d_ot.flatten(), error.flatten()])
+	error=(d_comp-d_lot)/(d_comp-d_ot)
+	error=error.flatten()
+	d_ot=d_ot.flatten()
+	d_ot=d_ot[error>-1]
+	error=error[error>-1]
+	error_dens=np.vstack([d_ot, error])
 	error_dens_c = gaussian_kde(error_dens)(error_dens)
-	axs[1].scatter(d_ot.flatten(), (error).flatten(), c=cm.Blues(error_dens_c/error_dens_c.max()))
-	# transport map distortion
-	error=(d_comp-d_ot)
-	error_dens=np.vstack([d_ot.flatten(), error.flatten()])
-	error_dens_c = gaussian_kde(error_dens)(error_dens)
-	axs[1].scatter(d_ot.flatten(), (error).flatten(), c=cm.Reds(error_dens_c/error_dens_c.max()))
-	
+	axs[1].scatter(d_ot, error, c=cm.Blues(error_dens_c/error_dens_c.max()))
+
 	# format axes
-	axs[0].set_ylabel(r"$d_{LOT}$", fontsize=12)
 	axs[1].set_xlabel(r"$d_{OT}$", fontsize=12)
-	axs[1].set_ylabel("residual", fontsize=12)
+
+	ybox1 = TextArea(r"$d_{LOT}  $", textprops=dict(color="b", size=12, rotation='vertical'))
+	ybox2 = TextArea(r"$  d_{comp}$", textprops=dict(color="r", size=12, rotation='vertical'))
+	ybox = VPacker(children=[ybox2, ybox1], align="center", pad=0, sep=5)
+	anchored_ybox = AnchoredOffsetbox(loc=8, child=ybox, pad=0., frameon=False,
+                                      bbox_to_anchor=(-0.08, 0.2),
+                                      bbox_transform=axs[0].transAxes, borderpad=0.)
+	axs[0].add_artist(anchored_ybox)
+
+	axs[1].set_ylabel(r"$\frac{d_{comp}-d_{LOT}}{d_{comp}-d_{OT}}$", fontsize=15)
+		
+	axs[0].set_xlim(0,d_ot.max())
+	axs[0].set_ylim(0, 1.4)
+	axs[1].set_ylim(-0.2, 1.1)
+
+	axs[0].annotate("a", (0.0025,1.3),   fontsize=16, weight='bold')
+	axs[1].annotate("b", (0.0025,1.01),   fontsize=16, weight='bold')
+
 	plt.tight_layout()
+
+	plt.savefig("./figs/OTmap_linearization_error_withcomp.pdf")
 	plt.show()
 
 def compare_transport_maps():
