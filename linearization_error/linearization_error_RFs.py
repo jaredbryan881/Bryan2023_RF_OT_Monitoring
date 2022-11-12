@@ -112,7 +112,6 @@ def linearization_error_RFs():
 
 		# calculate the transport map from rf1 to rf_ref
 		C_10=ot.dist(rf_ref, rf1, metric='euclidean') # GSOT distance matrix
-		#C_10=ot.dist(rf1, rf_ref, metric='euclidean')
 		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
 		p_10=ot.partial.partial_wasserstein(a,b,C_10,m=m) # transport plan
@@ -139,12 +138,11 @@ def linearization_error_RFs():
 
 			# calculate the transport map from rf_ref to rf2
 			C_02=ot.dist(rf2, rf_ref, metric='euclidean') # GSOT distance matrix
-			#C_02=ot.dist(rf_ref, rf2, metric='euclidean')
 			p_02=ot.partial.partial_wasserstein(a,b,C_02,m=m) # transport plan
 			# compose the two transport plans rf1->rf_ref->rf2
 			p_12_comp=np.matmul((npts_win*p_02).T, (npts_win*p_10).T)
-			f_12_comp=np.matmul(p_12_comp.T, rf1)
-			f_12_comp[np.sum(p_12_comp, axis=0)==0]=np.nan
+			f_12_comp=np.matmul((npts_win*p_02).T, np.matmul((npts_win*p_10).T, rf1))
+			f_12_comp[f_12_comp==0]=np.nan
 
 			dir_vs_comp=f_12-f_12_comp
 			dir_vs_comp_mag=np.sqrt(np.nansum((dir_vs_comp)**2)/npts_win)
@@ -178,7 +176,7 @@ def linearization_error_RFs():
 	error=error[error>-1]
 	error_dens=np.vstack([d_ot, error])
 	error_dens_c = gaussian_kde(error_dens)(error_dens)
-	axs[1].scatter(d_ot, error, c=cm.Blues(error_dens_c/error_dens_c.max()))
+	axs[1].scatter(d_ot, error, c=cm.Blues(error_dens_c/error_dens_c.max()), rasterized=True)
 
 	# format axes
 	axs[1].set_xlabel(r"$d_{OT}$", fontsize=12)
@@ -187,17 +185,17 @@ def linearization_error_RFs():
 	ybox2 = TextArea(r"$  d_{comp}$", textprops=dict(color="r", size=12, rotation='vertical'))
 	ybox = VPacker(children=[ybox2, ybox1], align="center", pad=0, sep=5)
 	anchored_ybox = AnchoredOffsetbox(loc=8, child=ybox, pad=0., frameon=False,
-                                      bbox_to_anchor=(-0.08, 0.2),
+                                      bbox_to_anchor=(-0.08, 0.33),
                                       bbox_transform=axs[0].transAxes, borderpad=0.)
 	axs[0].add_artist(anchored_ybox)
 
 	axs[1].set_ylabel(r"$\frac{d_{comp}-d_{LOT}}{d_{comp}-d_{OT}}$", fontsize=15)
 		
 	axs[0].set_xlim(0,d_ot.max())
-	axs[0].set_ylim(0, 1.4)
-	axs[1].set_ylim(-0.2, 1.1)
+	axs[0].set_ylim(0, 2.5)
+	axs[1].set_ylim(-0.1, 1.1)
 
-	axs[0].annotate("a", (0.0025,1.3),   fontsize=16, weight='bold')
+	axs[0].annotate("a", (0.0025,2.35),   fontsize=16, weight='bold')
 	axs[1].annotate("b", (0.0025,1.01),   fontsize=16, weight='bold')
 
 	plt.tight_layout()
