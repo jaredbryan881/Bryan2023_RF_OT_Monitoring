@@ -1,7 +1,7 @@
 import numpy as np
 from telewavesim import utils as ut
 
-def simulate_RF(model, slow, baz, npts, dt, wvtype='P', obs=False, freq=None, vels=None, len_factor=1, noise=None):
+def simulate_RF(model, slow, baz, npts, dt, wvtype='P', obs=False, freq=None, vels=None, len_factor=1, noise=None, comp='R'):
 	"""
 	Simulate the propagation of a plane wave through a stack of layers and calculate the resulting (radial) receiver function.
 
@@ -50,17 +50,22 @@ def simulate_RF(model, slow, baz, npts, dt, wvtype='P', obs=False, freq=None, ve
 		# don't rotate
 		tfs = ut.tf_from_xyz(trxyz, pvh=False)
 
+	if comp=='R':
+		ind=0
+	elif comp=="T":
+		ind=1
+
 	if noise is not None:
-		tfs[0].data+=noise
+		tfs[ind].data+=noise
 
 	# get receiver function by lowpass filtering transfer function
 	if freq is not None:
 		if type(freq)==list:
-			rf = tfs[0].filter('bandpass', freqmin=freq[0], freqmax=freq[1], corners=2, zerophase=True)
+			rf = tfs[ind].filter('bandpass', freqmin=freq[0], freqmax=freq[1], corners=2, zerophase=True)
 		else:
-			rf = tfs[0].filter('lowpass', freq=freq, corners=2, zerophase=True)
+			rf = tfs[ind].filter('lowpass', freq=freq, corners=2, zerophase=True)
 	else:
-		rf = tfs[0]
+		rf = tfs[ind]
 
 	# trim RF to undo time expansion
 	if len_factor>1:
