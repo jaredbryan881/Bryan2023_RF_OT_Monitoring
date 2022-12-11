@@ -31,19 +31,27 @@ def main():
 	slow = 0.05 # slowness
 	pert = -0.02
 	mass=0.95
+	noise_level=0.20
 
-	save_fig=True
+	save_fig=False
 
 	# load model
 	ref_model = ut.read_model(modfile)
 
 	# simulate default RFs at a range of slowness values
 	print("Generating reference distribution")
-	rf_ref = simulate_RF(ref_model, slow, baz, npts, dt, freq=flim, vels=None).data
+	rf_ref_ts = simulate_RF(ref_model, slow, baz, npts, dt, freq=flim, vels=None).data
 
+	# noise parameters
+	amax = np.max(np.abs(rf_ref_ts))
+	sigma=amax*noise_level
+	noise = np.random.normal(loc=0.0, scale=sigma, size=npts)
+	rf_ref_ts = simulate_RF(ref_model, slow, baz, npts, dt, freq=flim, vels=None, noise=noise).data
+
+	# time-amplitude scaling
 	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
-	delta_a = np.max(rf_ref)-np.min(rf_ref)
-	t_weight = delta_t/delta_a
+	delta_a = np.max(rf_ref_ts)-np.min(rf_ref_ts)
+	t_weight = (delta_t/delta_a)
 
 	pert_model = copy.deepcopy(ref_model)
 	pert_model.vs[0]*=(1+pert)
@@ -51,10 +59,8 @@ def main():
 
 	# Calculate the OT distance for the full distribution
 	# simulate default RFs at a range of slowness values
-	rf_pert = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
-
-	M_t = distance_matrix_1d(t_axis[t_inds,np.newaxis], t_axis[t_inds,np.newaxis])
-	M_a = distance_matrix_1d(rf_ref[t_inds,np.newaxis], rf_pert[t_inds,np.newaxis])
+	noise = np.random.normal(loc=0.0, scale=sigma, size=npts)
+	rf_pert_ts = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None, noise=noise).data
 
 	# Individual RFs
 	fig,axs=plt.subplots(3,1,sharex=True,sharey=True, figsize=(15,8))
@@ -63,19 +69,23 @@ def main():
 	for (l,lamb) in enumerate(lambs):
 		print("Lambda={}".format(lamb))
 
-		M_tlp = M_t + lamb*M_a
-		ot_map = partial_ot_dist_tlp(M_tlp, m=mass)
+		rf_ref=np.array([t_axis[t_inds], lamb*rf_ref_ts[t_inds]]).T
+		rf_pert=np.array([t_axis[t_inds], lamb*rf_pert_ts[t_inds]]).T
+		M_tlp=distance_matrix_1d(rf_ref, rf_pert)
 
-		axs[l].scatter(t_axis[t_inds], rf_ref[t_inds], c='crimson', ec=None, s=20)
-		axs[l].scatter(t_axis[t_inds], rf_pert[t_inds], c='steelblue', ec=None, s=20)
+		ot_map = partial_ot_dist_tlp(M_tlp, m=mass)
+		ot_map*=npts_win
+
+		axs[l].scatter(t_axis[t_inds], rf_ref_ts[t_inds], c='crimson', ec=None, s=20)
+		axs[l].scatter(t_axis[t_inds], rf_pert_ts[t_inds], c='steelblue', ec=None, s=20)
 
 		# iterate over times in first RF dist
 		for i in range(npts_win):
 			if np.sum(ot_map[i]==1)!=0:
 				# coords of the source point
 				vector_x = t_axis[t_inds][ot_map[i]==1]-t_axis[t_inds][i]
-				vector_y = rf_pert[t_inds][ot_map[i]==1]-rf_ref[t_inds][i]
-				axs[l].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref[t_inds][i], rf_ref[t_inds][i]+vector_y], c='k')
+				vector_y = rf_pert_ts[t_inds][ot_map[i]==1]-rf_ref_ts[t_inds][i]
+				axs[l].plot([t_axis[t_inds][i], t_axis[t_inds][i]+vector_x], [rf_ref_ts[t_inds][i], rf_ref_ts[t_inds][i]+vector_y], c='k')
 
 	plt.subplots_adjust(hspace=0)
 	axs[0].set_xlim(-1,10)
@@ -88,6 +98,10 @@ def main():
 	axs[0].yaxis.set_tick_params(labelsize=12)
 	axs[1].yaxis.set_tick_params(labelsize=12)
 	axs[2].yaxis.set_tick_params(labelsize=12)
+
+	axs[0].annotate("a", (-0.95,0.028),  fontsize=16, weight='bold')
+	axs[1].annotate("b", (-0.95,0.028),  fontsize=16, weight='bold')
+	axs[2].annotate("c", (-0.95,0.028),  fontsize=16, weight='bold')
 
 	plt.tight_layout()
 
