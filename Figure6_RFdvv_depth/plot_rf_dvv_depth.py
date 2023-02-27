@@ -17,8 +17,8 @@ def main():
 	# Parameters for raw synthetic RFs
 	modfile='../velocity_models/model_10lohs.txt'
 	wvtype='P' # incident wave type
-	npts=8193*5 # Number of samples
-	dt=0.01 # time discretization
+	npts=8193 # Number of samples
+	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
 	slow=0.06 # slowness limits
 	pert=-0.05
@@ -32,7 +32,7 @@ def main():
 	save_figs=False
 
 	# Parameters for optimal transport
-	m=0.9
+	m=0.95
 
 	np.random.seed(0)
 
@@ -53,7 +53,7 @@ def main():
 	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
 	delta_a = np.max(rf_ref_ts)-np.min(rf_ref_ts)
 	t_weight = (delta_t/delta_a)
-	rf_ref = np.array([t_axis[t_inds], rf_ref_ts[t_inds]]).T
+	rf_ref = np.array([t_axis[t_inds], t_weight*rf_ref_ts[t_inds]]).T
 
 	# ----- Calculate ensemble of RFs -----
 	rfs_pert = np.empty((n_layers, npts))
@@ -83,12 +83,12 @@ def main():
 		rfs_pert[i] = simulate_RF(pert_model, slow, baz, npts, dt, freq=flim, vels=None).data
 
 		# Turn 1D RF into 2D point cloud
-		rf_cur = np.array([t_axis[t_inds], rfs_pert[i,t_inds]]).T
+		rf_cur = np.array([t_axis[t_inds], t_weight*rfs_pert[i,t_inds]]).T
 
 		# ----- Calculate the distance matrix -----
 		M_t = distance_matrix_1d(t_axis[t_inds,np.newaxis], t_axis[t_inds,np.newaxis])
 		M_a = distance_matrix_1d(rf_cur[:,1,np.newaxis], rf_ref[:,1,np.newaxis])
-		M_tlp = M_t + t_weight*M_a
+		M_tlp = distance_matrix_1d(rf_ref, rf_cur)
 
 		# ----- Calculate the OT plan -----
 		M=ot.dist(rf_cur, rf_ref) # GSOT distance matrix
