@@ -19,6 +19,7 @@ import ot
 def main():
 	vary_slowness_vs()
 	vary_slowness_baz()
+	#vary_slowness_baz_vs()
 
 def vary_slowness_baz():
 	# ----- Define parameters -----
@@ -65,7 +66,7 @@ def vary_slowness_baz():
 		rfs_slow[i] = simulate_RF(ref_model, slow, np.mean(bazs), npts, dt, freq=flim, vels=None).data
 	for (i,baz) in enumerate(np.linspace(bazlim[0], bazlim[1]/2, 11)):
 		rfs_baz[i] = simulate_RF(ref_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
-	plot_true_signal_variation(rfs_slow, rfs_baz, t_axis, t_inds, foname="./figs/baz_slow/RF_true_signal_variation_bazslow.pdf")
+	plot_true_signal_variation(rfs_slow, rfs_baz, t_axis, t_inds)#, foname="./figs/baz_slow/RF_true_signal_variation_bazslow.pdf")
 
 	amax = np.max(np.abs(rf_ref_ts))
 	sigma=amax*noise_level
@@ -122,7 +123,7 @@ def vary_slowness_baz():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_ICA_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/baz_slow/embedding/RF_ICA_bazslow_embedding.pdf")
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim)#, foname="./figs/baz_slow/embedding/RF_ICA_bazslow_embedding.pdf")
 	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness [s/deg]", "Backazimuth [deg]"], cmaps=[cm.twilight,cm.inferno])
 
 
@@ -133,7 +134,7 @@ def vary_slowness_baz():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/baz_slow/embedding/RF_ICA_bazslow_waveform.pdf")
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)#, foname="./figs/baz_slow/embedding/RF_ICA_bazslow_waveform.pdf")
 	plot_ic_scatter([slows, bazs], ica, ncomp=ncomp, labels=["Slowness [s/deg]", "Backazimuth [deg]"], cmaps=[cm.twilight, cm.inferno])
 
 def vary_slowness_vs():
@@ -156,7 +157,7 @@ def vary_slowness_vs():
 
 	# Parameters for RF ensemble & noise
 	n_rfs = 1000 # number of RFs in the synthetic distributions
-	noise_level=0.0 # fraction of the range used for additive Gaussian noise
+	noise_level=0.00 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
 	m=0.95
@@ -184,7 +185,7 @@ def vary_slowness_vs():
 		pert_model.vs[0]*=(1+pert_s)
 		pert_model.update_tensor()
 		rfs_pert[i] = simulate_RF(pert_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
-	plot_true_signal_variation(rfs_slow, rfs_pert, t_axis, t_inds, foname="./figs/pert_slow/RF_true_signal_variation_pertslow.pdf")
+	#plot_true_signal_variation(rfs_slow, rfs_pert, t_axis, t_inds)#, foname="./figs/pert_slow/RF_true_signal_variation_pertslow.pdf")
 
 	amax = np.max(np.abs(rf_ref_ts))
 	sigma=amax*noise_level
@@ -241,7 +242,7 @@ def vary_slowness_vs():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_ICA_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_embedding.pdf")
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref, ncomp=ncomp, npts=npts_win, tlim=tlim)#, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_embedding.pdf")
 	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness [s/deg]", r"$dV_S/V_S$"], cmaps=[cm.coolwarm,cm.inferno])
 
 
@@ -252,7 +253,17 @@ def vary_slowness_vs():
 	# get estimated mixing matrix
 	A = ica.mixing_
 
-	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_waveform.pdf")
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)#, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_waveform.pdf")
+	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness [s/deg]", r"$dV_S/V_S$"], cmaps=[cm.coolwarm, cm.inferno])
+
+
+	# ----- Perform ICA in tangent space w/ Euclidean distance -----
+	ica = FastICA(n_components=ncomp)
+	# reconstruct signals
+	S = ica.fit_transform((rfs_pert[:,t_inds]-rf_ref_ts[t_inds]).T)
+	# get estimated mixing matrix
+	A = ica.mixing_
+	plot_ICA_signal_variation(A, S, t_weight, rf_ref_ts[t_inds], t_axis=t_axis[t_inds], ncomp=ncomp, npts=npts_win, tlim=tlim)#, foname="./figs/pert_slow/embedding/RF_ICA_pertslow_waveform.pdf")
 	plot_ic_scatter([slows, perts_s], ica, ncomp=ncomp, labels=["Slowness [s/deg]", r"$dV_S/V_S$"], cmaps=[cm.coolwarm, cm.inferno])
 
 def plot_true_signal_variation(rf1, rf2, t_axis, t_inds, foname=None):
@@ -309,6 +320,9 @@ def plot_ICA_signal_variation(A, S, t_weight, ref_signal, t_axis=None, ncomp=2, 
 			ax.spines[axis].set_linewidth(1.0)
 			ax.tick_params(axis='both', which='major', labelsize=16)
 
+	axs[0].annotate("a", (-0.95,0.028),   fontsize=16, weight='bold')
+	axs[1].annotate("b", (-0.95,0.028),   fontsize=16, weight='bold')
+
 	axs[0].set_xlim(tlim[0], tlim[1])
 	axs[-1].set_xlabel("Time [s]", fontsize=16)
 	plt.tight_layout()
@@ -322,7 +336,7 @@ def plot_ic_scatter(quants, ica, ncomp=2, labels=["Slowness [s/deg]", r"$dV_S/V_
 	# Plot mixing coefficients
 	# embedding space
 	Q=len(quants)
-	fig,axs=plt.subplots(ncomp,2,figsize=(10,5))
+	fig,axs=plt.subplots(ncomp,Q,figsize=(10,5))
 	for i in range(ncomp):
 		for j in range(Q):
 			axs[i,j].scatter(quants[j], ica.components_[i], c=cmaps[j]((quants[Q-j-1]-quants[Q-j-1].min())/(quants[Q-j-1].max()-quants[Q-j-1].min())), s=5, alpha=0.5)

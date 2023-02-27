@@ -33,6 +33,7 @@ def main():
 
 	# Parameters for optimal transport
 	m=0.97
+	m=(npts_win-7)/npts_win
 
 	sign=False
 
@@ -84,7 +85,8 @@ def main():
 		M=ot.dist(rf_cur, rf_ref) # GSOT distance matrix
 		a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 		b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
-		p=ot.partial.partial_wasserstein(a,b,M_tlp,m=m)
+		p=ot.partial.partial_wasserstein(a,b,M_tlp,m=m,nb_dummies=10)
+
 		valid_inds = np.sum(p,axis=0)!=0
 
 		# ----- Calculate the OT dist -----
