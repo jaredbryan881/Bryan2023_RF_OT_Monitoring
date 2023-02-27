@@ -26,7 +26,7 @@ def linearization_error_RFs():
 	npts=8193 # Number of samples
 	dt=0.05 # time discretization
 	baz=0.0 # Back-azimuth direction in degrees (has no influence if model is isotropic)
-	plim=[0.04,0.04] # slowness limits
+	plim=[0.04,0.08] # slowness limits
 	dvlim=[-0.05,0.05] # Vs perturbation limits
 
 	# Parameters for processed synthetic RFs
@@ -37,11 +37,11 @@ def linearization_error_RFs():
 	flim = 1.0 # bandpass frequencies
 
 	# Parameters for RF ensemble & noise
-	n_rfs=10 # number of RFs in the synthetic distributions
+	n_rfs=50 # number of RFs in the synthetic distributions
 	noise_level=0.0 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
-	m=0.99
+	m=0.95
 
 	save_figs=False
 
@@ -53,7 +53,6 @@ def linearization_error_RFs():
 	# Load model and calculate RF
 	ref_model = ut.read_model(modfile)
 	rf_ref_ts = simulate_RF(ref_model, np.mean(slows), baz, npts, dt, freq=flim, vels=None).data
-	rf_ref_ts = np.random.randn(npts)*rf_ref_ts.max()
 
 	# Turn 1D reference RF into a 2D point cloud via a time-amplitude scaling
 	delta_t = np.max(t_axis[t_inds])-np.min(t_axis[t_inds])
@@ -92,8 +91,7 @@ def linearization_error_RFs():
 			C=ot.dist(rf1, rf2, metric='euclidean') # GSOT distance matrix
 			a=np.ones((npts_win,))/float(npts_win) # uniform distribution over reference points
 			b=np.ones((npts_win,))/float(npts_win) # uniform distribution over current points
-			#p=ot.partial.partial_wasserstein(a,b,C,m=m)
-			p=ot.emd(a,b,C)
+			p=ot.partial.partial_wasserstein(a,b,C,m=m)
 			d=np.sum(C*p)
 
 			dists_lower_bound[i,j]=d
@@ -106,20 +104,20 @@ def linearization_error_RFs():
 			C_i0=ot.dist(rf1, rf_ref, metric='euclidean')
 			a=np.ones((N,))/float(N)
 			b=np.ones((N,))/float(N)
-			p_i0=ot.emd(a,b,C_i0)
+			p_i0=ot.partial.partial_wasserstein(a,b,C_i0,m=m)
 
 			# X0 to Xj
 			C_0j=ot.dist(rf_ref, rf2, metric='euclidean')
 			a=np.ones((N,))/float(N)
 			b=np.ones((N,))/float(N)
-			p_0j=ot.emd(a,b,C_0j)
+			p_0j=ot.partial.partial_wasserstein(a,b,C_0j,m=m)
 
 			# difference between direct transport map and the composition
 			# of two maps with the reference as the midpoint
 			direct_map=N*p.T
 			composed_map=np.matmul(N*p_0j.T, N*p_i0.T)
 			dir_vs_comp=direct_map-composed_map
-			dir_vs_comp_mag=np.sqrt(np.sum(dir_vs_comp**2))
+			dir_vs_comp_mag=np.sqrt(np.sum((dir_vs_comp)**2)/N)
 
 			dists_upper_bound[i,j] = d + dir_vs_comp_mag
 			dists_upper_bound[j,i] = d + dir_vs_comp_mag
@@ -149,7 +147,7 @@ def linearization_error_RFs():
 	fig,ax=plt.subplots(1,1)
 	ax.scatter(dists_lower_bound, dists_LOT, s=5, c='k')
 	ax.scatter(dists_lower_bound, dists_lower_bound, c='b', s=5)
-	#ax.scatter(dists_lower_bound, dists_upper_bound, c='r', s=5)
+	ax.scatter(dists_lower_bound, dists_upper_bound, c='r', s=5)
 	ax.set_ylabel(r"$d_{LOT}$", fontsize=12)
 	ax.set_xlabel(r"$d_{OT}$", fontsize=12)
 	plt.show()
@@ -197,14 +195,14 @@ def linearization_error_circles():
 			p=ot.emd(a,b,C)
 			d=np.sum(C*p)
 
-			#Vi=(np.matmul((N*p), X[j])-X[i])
-			#for alpha in np.linspace(0,1,5):
-			#	X_cur = X[i] + alpha*Vi
-			#	#X_cur = (1-alpha)*X[i] + alpha*np.matmul(N*p, X[j])
-			#	plt.scatter(X_cur[:,0], X_cur[:,1], c=cm.inferno(alpha))
-			#plt.scatter(X[i][:,0], X[i][:,1], c='r', s=1)
-			#plt.scatter(X[j][:,0], X[j][:,1], c='b', s=1)
-			#plt.show()
+			Vi=(np.matmul((N*p), X[j])-X[i])
+			for alpha in np.linspace(0,1,5):
+				X_cur = X[i] + alpha*Vi
+				#X_cur = (1-alpha)*X[i] + alpha*np.matmul(N*p, X[j])
+				plt.scatter(X_cur[:,0], X_cur[:,1], c=cm.inferno(alpha))
+			plt.scatter(X[i][:,0], X[i][:,1], c='r', s=1)
+			plt.scatter(X[j][:,0], X[j][:,1], c='b', s=1)
+			plt.show()
 
 			dists_lower_bound[i,j] = d
 			dists_lower_bound[j,i] = d
@@ -294,7 +292,7 @@ def linearization_error_circles():
 			axs[0].set_xlim(-5,5)
 			axs[0].set_ylim(-5,5)
 			plt.show()
-	"""
+	""" 
 
 	# Calculate the distance matrix with LOT
 	dists_LOT=np.zeros((M,M))
