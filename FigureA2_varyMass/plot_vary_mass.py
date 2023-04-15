@@ -30,7 +30,7 @@ def main():
 	flim = 1.0 # bandpass frequencies
 	slow = 0.05 # slowness
 	pert = -0.02
-	noise_level=0.20
+	noise_level=0.00
 
 	save_fig=False
 
@@ -68,7 +68,7 @@ def main():
 	# Individual RFs
 	fig,axs=plt.subplots(3,1,sharex=True,sharey=True, figsize=(15,8))
 
-	masses = [0.9,0.95]
+	masses = [0.9,0.97]
 	for (m,mass) in enumerate(masses):
 		print("--Mass={}".format(mass))
 

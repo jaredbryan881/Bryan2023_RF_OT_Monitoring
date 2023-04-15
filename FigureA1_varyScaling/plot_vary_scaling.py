@@ -30,8 +30,8 @@ def main():
 	flim = 1.0 # lowpass frequency
 	slow = 0.05 # slowness
 	pert = -0.02
-	mass=0.95
-	noise_level=0.20
+	mass=0.97
+	noise_level=0.00
 
 	save_fig=False
 

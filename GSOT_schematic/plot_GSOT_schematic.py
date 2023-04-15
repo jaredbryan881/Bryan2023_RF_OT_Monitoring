@@ -40,7 +40,7 @@ def plot_single_waveform_schematic():
 	noise_level=0.0 # fraction of the range used for additive Gaussian noise
 
 	# Parameters for optimal transport
-	m=0.95
+	m=0.97
 
 	save_figs=False
 
